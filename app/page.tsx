@@ -534,7 +534,10 @@ export default function DashboardPage() {
         )}
       </Header>
 
-      <div className="flex-1 overflow-y-auto p-8">
+      {/* Top padding lives inside the scroll content, not on the container —
+          padding on the scroll container offsets the sticky pin line and lets
+          cards peek out above the pinned group headers. */}
+      <div className="flex-1 overflow-y-auto px-8 pb-8">
         {notConnected ? (
           <EmptyState
             title="Chrome not connected"
@@ -551,7 +554,7 @@ export default function DashboardPage() {
             }
           />
         ) : loading ? (
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-5 pt-8 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
             {Array.from({ length: 8 }).map((_, i) => (
               <div key={i} className="animate-pulse overflow-hidden rounded-2xl bg-muted">
                 <div className="aspect-[16/10]" />
@@ -572,11 +575,11 @@ export default function DashboardPage() {
             }
           />
         ) : (
-          <div className="space-y-8">
+          <div className="space-y-8 pt-8">
             {groups.map((group) => (
               <div key={group.key} className="group/section">
                 {group.label && (
-                  <div className="sticky top-0 z-10 -mx-2 mb-2 flex items-center gap-3 rounded-lg bg-background/95 px-2 py-2 backdrop-blur-sm">
+                  <div className="sticky top-0 z-10 -mx-2 mb-2 flex items-center gap-3 rounded-b-lg bg-background/80 px-2 py-2 backdrop-blur-md">
                     {group.editable ? (
                       <EditableGroupHeader group={group} onRename={handleRenameWindow} />
                     ) : (
