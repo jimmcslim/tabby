@@ -1,4 +1,4 @@
-import { openTab } from "@/lib/chrome/cdp"
+import { openTab } from "@/lib/chrome/actions"
 import { getDb } from "@/lib/db"
 import { tabs } from "@/lib/db/schema"
 import { nanoid } from "nanoid"

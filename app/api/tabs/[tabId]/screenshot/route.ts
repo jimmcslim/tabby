@@ -1,6 +1,6 @@
 import { getDb } from "@/lib/db"
 import { tabs } from "@/lib/db/schema"
-import { captureScreenshot } from "@/lib/chrome/cdp"
+import { captureScreenshot, findTargetIdByUrl } from "@/lib/chrome/cdp"
 import { eq } from "drizzle-orm"
 import { NextRequest, NextResponse } from "next/server"
 import fs from "node:fs"
@@ -65,7 +65,16 @@ export async function GET(
   }
 
   try {
-    const buffer = await captureScreenshot(tab.chromeId)
+    // Extension-sourced tabs don't carry a CDP targetId — resolve one by URL.
+    // Screenshots are the one feature still requiring the CDP debug port.
+    let targetId = tab.chromeId
+    if (targetId.startsWith("ext:")) {
+      const found = await findTargetIdByUrl(tab.url)
+      if (!found) throw new Error("No CDP target for tab URL")
+      targetId = found
+    }
+
+    const buffer = await captureScreenshot(targetId)
     fs.writeFileSync(filePath, buffer)
     return jpegResponse(buffer, 300)
   } catch (error) {

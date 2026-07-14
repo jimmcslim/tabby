@@ -1,4 +1,4 @@
-import { closeTab } from "@/lib/chrome/cdp"
+import { closeTab } from "@/lib/chrome/actions"
 import { getDb } from "@/lib/db"
 import { tabs } from "@/lib/db/schema"
 import { eq } from "drizzle-orm"
