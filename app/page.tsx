@@ -576,7 +576,7 @@ export default function DashboardPage() {
             {groups.map((group) => (
               <div key={group.key} className="group/section">
                 {group.label && (
-                  <div className="mb-4 flex items-center gap-3">
+                  <div className="sticky top-0 z-10 -mx-2 mb-2 flex items-center gap-3 rounded-lg bg-background/95 px-2 py-2 backdrop-blur-sm">
                     {group.editable ? (
                       <EditableGroupHeader group={group} onRename={handleRenameWindow} />
                     ) : (
