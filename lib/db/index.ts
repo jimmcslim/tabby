@@ -1,5 +1,6 @@
 import type { BunSQLiteDatabase } from "drizzle-orm/bun-sqlite"
 import type * as schema from "./schema"
+import fs from "fs"
 import path from "path"
 
 type DB = BunSQLiteDatabase<typeof schema>
@@ -13,6 +14,7 @@ async function initDb(): Promise<DB> {
   const { drizzle } = await import("drizzle-orm/bun-sqlite")
   const s = await import("./schema")
 
+  fs.mkdirSync(path.dirname(DB_PATH), { recursive: true })
   const sqlite = new Database(DB_PATH, { create: true })
   sqlite.exec("PRAGMA journal_mode = WAL")
   sqlite.exec("PRAGMA foreign_keys = ON")

@@ -90,6 +90,27 @@ async function cdp(method: string, params: Record<string, unknown> = {}): Promis
   return cdpCommand(ws, method, params)
 }
 
+// Workona's tab suspender parks tabs at workona.com/redirect/ with the
+// original url/title/favicon URL-encoded in the hash fragment.
+function unwrapWorkonaUrl(
+  rawUrl: string,
+): { url: string; title?: string; faviconUrl?: string } | null {
+  try {
+    const u = new URL(rawUrl)
+    if (!u.hostname.endsWith("workona.com") || !u.hash) return null
+    const params = new URLSearchParams(u.hash.slice(1))
+    const url = params.get("url")
+    if (!url || !/^https?:\/\//i.test(url)) return null
+    return {
+      url,
+      title: params.get("title") || undefined,
+      faviconUrl: params.get("favIconUrl") || undefined,
+    }
+  } catch {
+    return null
+  }
+}
+
 export async function listTabs(): Promise<ChromeTab[]> {
   const result = await cdp("Target.getTargets")
   const pages = (result.targetInfos || []).filter((t: any) => t.type === "page")
@@ -102,14 +123,18 @@ export async function listTabs(): Promise<ChromeTab[]> {
     )
   )
 
-  return pages.map((t: any, i: number) => ({
-    id: t.targetId,
-    type: t.type,
-    title: t.title,
-    url: t.url,
-    faviconUrl: t.faviconUrl || null,
-    windowId: windowResults[i].status === "fulfilled" ? windowResults[i].value.windowId : null,
-  }))
+  return pages.map((t: any, i: number) => {
+    const workona = unwrapWorkonaUrl(t.url)
+    return {
+      id: t.targetId,
+      type: t.type,
+      title: workona?.title || t.title,
+      url: workona?.url ?? t.url,
+      faviconUrl: workona?.faviconUrl || t.faviconUrl || null,
+      windowId: windowResults[i].status === "fulfilled" ? windowResults[i].value.windowId : null,
+      suspended: !!workona,
+    }
+  })
 }
 
 export async function closeTab(chromeId: string): Promise<void> {

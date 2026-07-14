@@ -52,7 +52,11 @@ export async function syncTabs(): Promise<SyncResult> {
       // Queue enrichment
       if (isTweetUrl(domain) && !existing.description) {
         tweetFetchQueue.push({ id: existing.id, url: chromeTab.url })
-      } else if (existing.url !== chromeTab.url && !existing.ogImage && shouldPreferOgImage(domain)) {
+      } else if (
+        existing.url !== chromeTab.url &&
+        !existing.ogImage &&
+        (shouldPreferOgImage(domain) || chromeTab.suspended)
+      ) {
         ogFetchQueue.push({ id: existing.id, url: chromeTab.url })
       }
       updated++
@@ -78,7 +82,7 @@ export async function syncTabs(): Promise<SyncResult> {
 
       if (isTweetUrl(domain)) {
         tweetFetchQueue.push({ id, url: chromeTab.url })
-      } else if (shouldPreferOgImage(domain)) {
+      } else if (shouldPreferOgImage(domain) || chromeTab.suspended) {
         ogFetchQueue.push({ id, url: chromeTab.url })
       }
       added++

@@ -6,6 +6,8 @@ export interface ChromeTab {
   faviconUrl?: string
   windowId?: number | null
   webSocketDebuggerUrl?: string
+  /** True when the tab is parked by a suspender (e.g. Workona) and url was unwrapped */
+  suspended?: boolean
 }
 
 export interface Tab {
