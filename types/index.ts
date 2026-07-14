@@ -5,6 +5,10 @@ export interface ChromeTab {
   url: string
   faviconUrl?: string
   windowId?: number | null
+  /** Position in the window's tab strip (extension source only) */
+  tabIndex?: number | null
+  /** When the tab was last focused, ISO string (extension source only) */
+  lastAccessedAt?: string | null
   webSocketDebuggerUrl?: string
   /** True when the tab is parked by a suspender (e.g. Workona) and url was unwrapped */
   suspended?: boolean
@@ -24,6 +28,8 @@ export interface Tab {
   ogImage: string | null
   description: string | null
   windowId: number | null
+  tabIndex: number | null
+  lastAccessedAt: string | null
   isArticle: boolean | null
   isPinned: boolean
   firstSeenAt: string

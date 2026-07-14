@@ -108,6 +108,9 @@ export async function syncTabsFromList(chromeTabs: ChromeTab[]): Promise<SyncRes
           domain,
           faviconUrl: chromeTab.faviconUrl || existing.faviconUrl,
           windowId: chromeTab.windowId ?? null,
+          tabIndex: chromeTab.tabIndex ?? null,
+          // CDP doesn't report focus times — keep the last extension-provided value
+          lastAccessedAt: chromeTab.lastAccessedAt ?? existing.lastAccessedAt,
           lastSeenAt: now,
           updatedAt: now,
         })
@@ -136,6 +139,8 @@ export async function syncTabsFromList(chromeTabs: ChromeTab[]): Promise<SyncRes
           domain,
           faviconUrl: chromeTab.faviconUrl || null,
           windowId: chromeTab.windowId ?? null,
+          tabIndex: chromeTab.tabIndex ?? null,
+          lastAccessedAt: chromeTab.lastAccessedAt ?? null,
           status: "open",
           type: chromeTab.type,
           firstSeenAt: now,

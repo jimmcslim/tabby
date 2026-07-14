@@ -103,6 +103,18 @@ async function initDb(): Promise<DB> {
     // column already exists
   }
 
+  try {
+    sqlite.exec(`ALTER TABLE tabs ADD COLUMN tab_index INTEGER`)
+  } catch {
+    // column already exists
+  }
+
+  try {
+    sqlite.exec(`ALTER TABLE tabs ADD COLUMN last_accessed_at TEXT`)
+  } catch {
+    // column already exists
+  }
+
   return drizzle(sqlite, { schema: s })
 }
 

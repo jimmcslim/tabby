@@ -31,6 +31,8 @@ function tabToChromeTab(t) {
     url: t.url,
     faviconUrl: t.favIconUrl || null,
     windowId: t.windowId,
+    tabIndex: t.index,
+    lastAccessedAt: t.lastAccessed ? new Date(t.lastAccessed).toISOString() : null,
   }
 }
 

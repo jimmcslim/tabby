@@ -30,6 +30,29 @@ import { SparklesIcon, PencilEdit01Icon, Copy01Icon, SleepingIcon, Cancel01Icon 
 import { toast } from "sonner"
 
 type GroupBy = "window" | "category" | "domain" | "none"
+type SortBy = "browser" | "lastAccessed" | "oldest" | "newest" | "title" | "domain"
+
+// Applied within each group. tabIndex/lastAccessedAt only exist for
+// extension-sourced tabs; both sorts fall back to first-seen order.
+function sortTabs(tabs: Tab[], sortBy: SortBy): Tab[] {
+  const byFirstSeen = (a: Tab, b: Tab) => a.firstSeenAt.localeCompare(b.firstSeenAt)
+  const cmp: (a: Tab, b: Tab) => number = {
+    browser: (a: Tab, b: Tab) =>
+      (a.windowId ?? Number.MAX_SAFE_INTEGER) - (b.windowId ?? Number.MAX_SAFE_INTEGER) ||
+      (a.tabIndex ?? Number.MAX_SAFE_INTEGER) - (b.tabIndex ?? Number.MAX_SAFE_INTEGER) ||
+      byFirstSeen(a, b),
+    lastAccessed: (a: Tab, b: Tab) =>
+      (b.lastAccessedAt ?? "").localeCompare(a.lastAccessedAt ?? "") || -byFirstSeen(a, b),
+    oldest: byFirstSeen,
+    newest: (a: Tab, b: Tab) => -byFirstSeen(a, b),
+    title: (a: Tab, b: Tab) =>
+      (a.title || a.url).localeCompare(b.title || b.url, undefined, { sensitivity: "base" }),
+    domain: (a: Tab, b: Tab) =>
+      (a.domain || "").localeCompare(b.domain || "") ||
+      (a.title || a.url).localeCompare(b.title || b.url, undefined, { sensitivity: "base" }),
+  }[sortBy]
+  return [...tabs].sort(cmp)
+}
 
 interface TabGroup {
   key: string // raw key for identification (e.g. windowId "1382002407")
@@ -166,6 +189,7 @@ export default function DashboardPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [detailTab, setDetailTab] = useState<Tab | null>(null)
   const [groupBy, setGroupBy] = useState<GroupBy>("window")
+  const [sortBy, setSortBy] = useState<SortBy>("browser")
   const [windowNames, setWindowNames] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [classifyingAll, setClassifyingAll] = useState(false)
@@ -417,7 +441,14 @@ export default function DashboardPage() {
     setCloseGroupConfirm(null)
   }, [closeGroupConfirm])
 
-  const groups = useMemo(() => groupTabs(tabs, groupBy, windowNames), [tabs, groupBy, windowNames])
+  const groups = useMemo(
+    () =>
+      groupTabs(tabs, groupBy, windowNames).map((g) => ({
+        ...g,
+        tabs: sortTabs(g.tabs, sortBy),
+      })),
+    [tabs, groupBy, windowNames, sortBy],
+  )
   const notConnected = chromeStatus && !chromeStatus.connected
   const hasUnclassified = tabs.some((t) => !t.category)
 
@@ -435,6 +466,22 @@ export default function DashboardPage() {
               <SelectItem value="category">Category</SelectItem>
               <SelectItem value="domain">Domain</SelectItem>
               <SelectItem value="none">None</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
+        {tabs.length > 0 && (
+          <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortBy)}>
+            <SelectTrigger size="sm">
+              <span className="text-muted-foreground">Sort by:</span>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent align="end" alignItemWithTrigger={false}>
+              <SelectItem value="browser">Browser order</SelectItem>
+              <SelectItem value="lastAccessed">Recently used</SelectItem>
+              <SelectItem value="oldest">Oldest first</SelectItem>
+              <SelectItem value="newest">Newest first</SelectItem>
+              <SelectItem value="title">Title</SelectItem>
+              <SelectItem value="domain">Domain</SelectItem>
             </SelectContent>
           </Select>
         )}
