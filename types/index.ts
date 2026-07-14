@@ -58,7 +58,44 @@ export interface ChromeStatus {
   version?: string
   debugUrl: string
   error?: string
+  source?: "extension" | "cdp" | "none"
+  extension?: {
+    connected: boolean
+    sse: boolean
+    lastReportAt: string | null
+    version?: string
+  }
 }
+
+// --- Chrome extension bridge protocol ---
+
+/** POST body the extension sends to /api/extension/sync */
+export interface ExtensionSnapshot {
+  extensionVersion: string
+  tabs: ChromeTab[]
+}
+
+/** Command the server pushes to the extension (SSE or sync-response backlog) */
+export interface ExtensionCommand {
+  id: string
+  type: "focus" | "close" | "open" | "snapshot"
+  /** Numeric chrome.tabs id (chromeId with the "ext:" prefix stripped) */
+  tabId?: number
+  url?: string
+}
+
+/** POST body the extension sends to /api/extension/ack */
+export interface ExtensionCommandAck {
+  commandId: string
+  ok: boolean
+  error?: string
+  data?: unknown
+}
+
+export type ExtensionEvent =
+  | { type: "connected" }
+  | { type: "ping" }
+  | { type: "command"; command: ExtensionCommand }
 
 export interface OllamaStatus {
   connected: boolean
