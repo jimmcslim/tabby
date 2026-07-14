@@ -1,4 +1,5 @@
 import type { ChromeTab } from "@/types"
+import { unwrapWorkonaUrl } from "./workona"
 import fs from "node:fs"
 import path from "node:path"
 import os from "node:os"
@@ -90,27 +91,6 @@ async function cdp(method: string, params: Record<string, unknown> = {}): Promis
   return cdpCommand(ws, method, params)
 }
 
-// Workona's tab suspender parks tabs at workona.com/redirect/ with the
-// original url/title/favicon URL-encoded in the hash fragment.
-function unwrapWorkonaUrl(
-  rawUrl: string,
-): { url: string; title?: string; faviconUrl?: string } | null {
-  try {
-    const u = new URL(rawUrl)
-    if (!u.hostname.endsWith("workona.com") || !u.hash) return null
-    const params = new URLSearchParams(u.hash.slice(1))
-    const url = params.get("url")
-    if (!url || !/^https?:\/\//i.test(url)) return null
-    return {
-      url,
-      title: params.get("title") || undefined,
-      faviconUrl: params.get("favIconUrl") || undefined,
-    }
-  } catch {
-    return null
-  }
-}
-
 export async function listTabs(): Promise<ChromeTab[]> {
   const result = await cdp("Target.getTargets")
   const pages = (result.targetInfos || []).filter((t: any) => t.type === "page")
@@ -135,6 +115,18 @@ export async function listTabs(): Promise<ChromeTab[]> {
       suspended: !!workona,
     }
   })
+}
+
+/**
+ * Look up a CDP targetId by exact URL — used to capture screenshots of tabs
+ * whose chromeId came from the extension ("ext:<n>") rather than CDP.
+ */
+export async function findTargetIdByUrl(url: string): Promise<string | null> {
+  const result = await cdp("Target.getTargets")
+  const match = (result.targetInfos || []).find(
+    (t: any) => t.type === "page" && t.url === url,
+  )
+  return match?.targetId ?? null
 }
 
 export async function closeTab(chromeId: string): Promise<void> {
