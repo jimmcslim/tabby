@@ -5,6 +5,7 @@ import type { Tab } from "@/types"
 import { useSyncContext } from "@/components/providers/sync-provider"
 import { Header } from "@/components/layout/header"
 import { TabGrid } from "@/components/tabs/tab-grid"
+import { TabList } from "@/components/tabs/tab-list"
 import { TabDetailSheet } from "@/components/tabs/tab-detail-sheet"
 import { ReaderSheet } from "@/components/tabs/reader-sheet"
 import { BulkActionBar } from "@/components/tabs/bulk-action-bar"
@@ -25,8 +26,17 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { SparklesIcon, PencilEdit01Icon, Copy01Icon, SleepingIcon, Cancel01Icon } from "@hugeicons/core-free-icons"
+import {
+  SparklesIcon,
+  PencilEdit01Icon,
+  Copy01Icon,
+  SleepingIcon,
+  Cancel01Icon,
+  GridViewIcon,
+  ListViewIcon,
+} from "@hugeicons/core-free-icons"
 import { toast } from "sonner"
 
 type GroupBy = "window" | "category" | "domain" | "none"
@@ -190,6 +200,7 @@ export default function DashboardPage() {
   const [detailTab, setDetailTab] = useState<Tab | null>(null)
   const [groupBy, setGroupBy] = useState<GroupBy>("window")
   const [sortBy, setSortBy] = useState<SortBy>("browser")
+  const [view, setView] = useState<"card" | "list">("card")
   const [windowNames, setWindowNames] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [classifyingAll, setClassifyingAll] = useState(false)
@@ -456,6 +467,24 @@ export default function DashboardPage() {
     <>
       <Header title="Dashboard" searchValue={search} onSearchChange={setSearch}>
         {tabs.length > 0 && (
+          <ToggleGroup
+            variant="outline"
+            size="sm"
+            value={[view]}
+            onValueChange={(value) => {
+              const next = value[0] as "card" | "list" | undefined
+              if (next) setView(next)
+            }}
+          >
+            <ToggleGroupItem value="card" aria-label="Card view" title="Card view">
+              <HugeiconsIcon icon={GridViewIcon} className="size-4" />
+            </ToggleGroupItem>
+            <ToggleGroupItem value="list" aria-label="List view" title="List view">
+              <HugeiconsIcon icon={ListViewIcon} className="size-4" />
+            </ToggleGroupItem>
+          </ToggleGroup>
+        )}
+        {tabs.length > 0 && (
           <Select value={groupBy} onValueChange={(v) => setGroupBy(v as GroupBy)}>
             <SelectTrigger size="sm">
               <span className="text-muted-foreground">Group by:</span>
@@ -569,16 +598,29 @@ export default function DashboardPage() {
                     </button>
                   </div>
                 )}
-                <TabGrid
-                  tabs={group.tabs}
-                  selectedIds={selectedIds}
-                  onSelect={handleSelect}
-                  onFocus={handleFocus}
-                  onClose={handleClose}
-                  onClassify={handleClassify}
-                  onTabClick={setDetailTab}
-                  onReadArticle={setReaderTab}
-                />
+                {view === "card" ? (
+                  <TabGrid
+                    tabs={group.tabs}
+                    selectedIds={selectedIds}
+                    onSelect={handleSelect}
+                    onFocus={handleFocus}
+                    onClose={handleClose}
+                    onClassify={handleClassify}
+                    onTabClick={setDetailTab}
+                    onReadArticle={setReaderTab}
+                  />
+                ) : (
+                  <TabList
+                    tabs={group.tabs}
+                    selectedIds={selectedIds}
+                    onSelect={handleSelect}
+                    onFocus={handleFocus}
+                    onClose={handleClose}
+                    onClassify={handleClassify}
+                    onTabClick={setDetailTab}
+                    onReadArticle={setReaderTab}
+                  />
+                )}
               </div>
             ))}
           </div>
