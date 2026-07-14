@@ -1,0 +1,95 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        width: 260px;
+        margin: 0;
+        padding: 12px;
+        font-size: 13px;
+        color: #1a1a1a;
+      }
+      @media (prefers-color-scheme: dark) {
+        body {
+          background: #1e1e1e;
+          color: #e6e6e6;
+        }
+        input {
+          background: #2a2a2a;
+          color: #e6e6e6;
+          border-color: #444;
+        }
+      }
+      h1 {
+        font-size: 14px;
+        margin: 0 0 8px;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 8px;
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #999;
+        flex-shrink: 0;
+      }
+      .dot.ok {
+        background: #22c55e;
+      }
+      .dot.bad {
+        background: #ef4444;
+      }
+      input {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 5px 7px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        font-size: 12px;
+      }
+      label {
+        display: block;
+        font-size: 11px;
+        opacity: 0.7;
+        margin-bottom: 3px;
+      }
+      button {
+        width: 100%;
+        padding: 6px;
+        margin-top: 8px;
+        border: none;
+        border-radius: 5px;
+        background: #3b82f6;
+        color: white;
+        font-size: 12px;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #2563eb;
+      }
+      .muted {
+        font-size: 11px;
+        opacity: 0.6;
+        margin-top: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Tabby Connector</h1>
+    <div class="row">
+      <div id="dot" class="dot"></div>
+      <span id="status">Checking…</span>
+    </div>
+    <label for="baseUrl">Tabby server URL</label>
+    <input id="baseUrl" type="text" placeholder="http://localhost:3000" />
+    <button id="sync">Sync now</button>
+    <div id="detail" class="muted"></div>
+    <script src="popup.js"></script>
+  </body>
+</html>
