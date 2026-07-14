@@ -13,6 +13,7 @@ import {
   Image01Icon,
   ArrowReloadHorizontalIcon,
   GlassesIcon,
+  MoreHorizontalIcon,
 } from "@hugeicons/core-free-icons"
 import { isArticleTab } from "@/components/tabs/reader-sheet"
 
@@ -141,7 +142,7 @@ export function TabCard({ tab, isSelected, onSelect, onFocus, onClose, onClassif
       className={`group relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border bg-card transition-all hover:shadow-lg ${
         isSelected ? "border-primary ring-2 ring-primary/20" : "border-border/60 hover:border-border"
       }`}
-      onClick={() => onClick(tab)}
+      onClick={() => (tab.status === "open" ? onFocus(tab.id) : onClick(tab))}
     >
       {/* Screenshot preview */}
       <div className="relative aspect-[16/10] overflow-hidden bg-muted/30">
@@ -216,9 +217,16 @@ export function TabCard({ tab, isSelected, onSelect, onFocus, onClose, onClassif
               Focus
             </button>
           )}
+          <button
+            className="ml-auto inline-flex items-center rounded-lg bg-white/15 p-1.5 text-white backdrop-blur-sm transition-colors hover:bg-white/25"
+            onClick={() => onClick(tab)}
+            title="Details"
+          >
+            <HugeiconsIcon icon={MoreHorizontalIcon} className="size-3.5" />
+          </button>
           {tab.status === "open" && (
             <button
-              className="ml-auto inline-flex items-center rounded-lg bg-white/15 p-1.5 text-white backdrop-blur-sm transition-colors hover:bg-red-500/80"
+              className="inline-flex items-center rounded-lg bg-white/15 p-1.5 text-white backdrop-blur-sm transition-colors hover:bg-red-500/80"
               onClick={() => onClose(tab.id)}
               title="Close tab"
             >

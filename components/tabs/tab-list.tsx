@@ -10,6 +10,7 @@ import {
   SparklesIcon,
   ArrowReloadHorizontalIcon,
   GlassesIcon,
+  MoreHorizontalIcon,
 } from "@hugeicons/core-free-icons"
 import { isArticleTab } from "@/components/tabs/reader-sheet"
 
@@ -60,7 +61,7 @@ export function TabList({ tabs, selectedIds, onSelect, onFocus, onClose, onClass
             className={`group flex cursor-pointer items-center gap-3 px-3 py-2 transition-colors ${
               isSelected ? "bg-primary/5" : "hover:bg-muted/50"
             }`}
-            onClick={() => onTabClick(tab)}
+            onClick={() => (tab.status === "open" ? onFocus(tab.id) : onTabClick(tab))}
           >
             <div onClick={(e) => e.stopPropagation()}>
               <div className={`transition-opacity ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
@@ -93,6 +94,7 @@ export function TabList({ tabs, selectedIds, onSelect, onFocus, onClose, onClass
               {tab.status === "open" && (
                 <ActionButton icon={CursorPointer01Icon} title="Focus in Chrome" onClick={() => onFocus(tab.id)} />
               )}
+              <ActionButton icon={MoreHorizontalIcon} title="Details" onClick={() => onTabClick(tab)} />
               {tab.status === "open" && (
                 <ActionButton icon={Cancel01Icon} title="Close tab" destructive onClick={() => onClose(tab.id)} />
               )}
