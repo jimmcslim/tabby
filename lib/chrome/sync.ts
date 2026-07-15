@@ -1,16 +1,10 @@
 import { getDb } from "@/lib/db"
 import { tabs } from "@/lib/db/schema"
-import { listTabs } from "./cdp"
 import { eq } from "drizzle-orm"
 import { nanoid } from "nanoid"
 import { updateAutoSession } from "@/lib/sessions/auto-save"
 import { shouldPreferOgImage, fetchOgImage, isTweetUrl, fetchTweetData } from "@/lib/og"
-import {
-  getBridge,
-  isExtensionSseConnected,
-  isExtensionFresh,
-  dispatchCommand,
-} from "@/lib/extension/bridge"
+import { getBridge, isExtensionSseConnected, dispatchCommand } from "@/lib/extension/bridge"
 import type { ChromeTab, SyncResult, TabSuspendedState } from "@/types"
 
 function extractDomain(url: string): string | null {
@@ -40,10 +34,9 @@ function isSyncResult(data: unknown): data is SyncResult {
 const EMPTY_RESULT: SyncResult = { added: 0, updated: 0, closed: 0, total: 0 }
 
 /**
- * Sync from whichever source is live: if the extension is connected over SSE,
- * ask it for a fresh snapshot (it pushes to /api/extension/sync, which runs
- * syncTabsFromList); if it reported recently, trust that data; otherwise fall
- * back to pulling via CDP.
+ * Ask the extension for a fresh snapshot (it pushes to /api/extension/sync,
+ * which runs syncTabsFromList). If SSE is down the extension pushes on its
+ * own cadence anyway, so the last result is at most one interval stale.
  */
 export async function syncTabs(): Promise<SyncResult> {
   if (isExtensionSseConnected()) {
@@ -53,16 +46,8 @@ export async function syncTabs(): Promise<SyncResult> {
     } catch {
       // fall through to last known result
     }
-    return getBridge().lastSyncResult ?? EMPTY_RESULT
   }
-
-  if (await isExtensionFresh()) {
-    // Extension is the active source but SSE is momentarily down; its data is
-    // at most one debounce interval stale. Don't touch CDP (DevTools banner).
-    return getBridge().lastSyncResult ?? EMPTY_RESULT
-  }
-
-  return syncTabsFromList(await listTabs())
+  return getBridge().lastSyncResult ?? EMPTY_RESULT
 }
 
 export async function syncTabsFromList(chromeTabs: ChromeTab[]): Promise<SyncResult> {
@@ -74,10 +59,9 @@ export async function syncTabsFromList(chromeTabs: ChromeTab[]): Promise<SyncRes
   const chromeIdSet = new Set(chromeTabs.map((t) => t.id))
   const dbChromeIdMap = new Map(dbTabs.map((t) => [t.chromeId, t]))
 
-  // Rebind pass: when the source switches (CDP targetIds <-> extension ids)
-  // or Chrome restarts, every id changes at once. Rebind by exact URL match
-  // instead of closing and reinserting all tabs. Open rows with a null
-  // chromeId (recovered/anomalous state) are rebind candidates too.
+  // Rebind pass: when Chrome restarts (or after data recovery), every tab id
+  // changes at once. Rebind by exact URL match instead of closing and
+  // reinserting all tabs. Open rows with a null chromeId are candidates too.
   const missingByUrl = new Map<string, (typeof dbTabs)[number][]>()
   for (const dbTab of dbTabs) {
     if (!dbTab.chromeId || !chromeIdSet.has(dbTab.chromeId)) {
@@ -116,7 +100,6 @@ export async function syncTabsFromList(chromeTabs: ChromeTab[]): Promise<SyncRes
           faviconUrl: chromeTab.faviconUrl || existing.faviconUrl,
           windowId: chromeTab.windowId ?? null,
           tabIndex: chromeTab.tabIndex ?? null,
-          // CDP doesn't report focus times — keep the last extension-provided value
           lastAccessedAt: chromeTab.lastAccessedAt ?? existing.lastAccessedAt,
           suspendedState: suspendedStateOf(chromeTab),
           lastSeenAt: now,

@@ -559,14 +559,13 @@ export default function DashboardPage() {
         {notConnected ? (
           <EmptyState
             title="Chrome not connected"
-            description="Enable remote debugging in your normal Chrome — no restart or separate profile needed."
+            description="Install the Tabby Connector extension — it pushes your tabs here and needs no special Chrome flags."
             action={
               <div className="space-y-2 text-left">
                 <div className="rounded-lg bg-muted px-4 py-3 space-y-2">
-                  <p className="text-xs font-medium">1. Open this URL in Chrome:</p>
-                  <code className="block text-xs">chrome://inspect/#remote-debugging</code>
-                  <p className="text-xs font-medium">2. Enable remote debugging and allow connections.</p>
-                  <p className="text-xs font-medium">3. Tabby will auto-connect within 30 seconds.</p>
+                  <p className="text-xs font-medium">1. Open <code className="text-xs">chrome://extensions</code> and enable Developer mode.</p>
+                  <p className="text-xs font-medium">2. Click &ldquo;Load unpacked&rdquo; and select this repo&apos;s <code className="text-xs">extension/</code> folder.</p>
+                  <p className="text-xs font-medium">3. Tabby connects automatically within a few seconds.</p>
                 </div>
               </div>
             }

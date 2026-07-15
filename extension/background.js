@@ -100,6 +100,48 @@ chrome.windows.onCreated.addListener(() => {
 })
 chrome.windows.onRemoved.addListener(scheduleSnapshot)
 
+// --- Screenshot capture ------------------------------------------------------
+// Capture the visible tab shortly after it's activated (once the page has had
+// a moment to paint) and push it to the server's preview cache.
+
+let captureTimer = null
+
+function scheduleCapture() {
+  if (captureTimer) clearTimeout(captureTimer)
+  captureTimer = setTimeout(() => {
+    captureTimer = null
+    captureActiveTab()
+  }, 1500)
+}
+
+async function captureActiveTab() {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true })
+    if (!tab || !tab.url || !/^https?:/i.test(tab.url) || tab.discarded) return
+
+    const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
+      format: "jpeg",
+      quality: 70,
+    })
+    if (!dataUrl) return
+
+    const baseUrl = await getBaseUrl()
+    await fetch(baseUrl + "/api/extension/screenshot", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tabId: "ext:" + tab.id, dataUrl }),
+    })
+  } catch (e) {
+    // Capture fails on protected pages or minimized windows — not worth noise
+    console.debug("[tabby] capture skipped:", e.message)
+  }
+}
+
+chrome.tabs.onActivated.addListener(scheduleCapture)
+chrome.windows.onFocusChanged.addListener((windowId) => {
+  if (windowId !== chrome.windows.WINDOW_ID_NONE) scheduleCapture()
+})
+
 // --- Command execution -------------------------------------------------------
 
 async function executeCommand(command) {

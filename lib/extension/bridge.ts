@@ -1,10 +1,5 @@
 import { nanoid } from "nanoid"
-import { getDb } from "@/lib/db"
-import { settings } from "@/lib/db/schema"
-import { eq } from "drizzle-orm"
 import type { ExtensionCommand, ExtensionCommandAck, SyncResult } from "@/types"
-
-const LAST_REPORT_KEY = "extension_last_report_at"
 
 interface PendingCommand {
   resolve: (data: unknown) => void
@@ -17,7 +12,6 @@ interface Bridge {
   backlog: ExtensionCommand[]
   pending: Map<string, PendingCommand>
   lastReportAt: number | null
-  lastReportLoaded: boolean
   lastSyncResult: SyncResult | null
   extensionVersion?: string
 }
@@ -33,7 +27,6 @@ export function getBridge(): Bridge {
       backlog: [],
       pending: new Map(),
       lastReportAt: null,
-      lastReportLoaded: false,
       lastSyncResult: null,
     } satisfies Bridge
   }
@@ -44,48 +37,17 @@ export function isExtensionSseConnected(): boolean {
   return getBridge().subscribers.size > 0
 }
 
-export async function isExtensionFresh(maxAgeMs = 90_000): Promise<boolean> {
+/** True when the extension pushed a snapshot recently (covers SSE reconnect gaps) */
+export function isExtensionFresh(maxAgeMs = 90_000): boolean {
   const bridge = getBridge()
-
-  // Hydrate from settings once so a restarted server prefers the extension
-  // during its reconnect window instead of falling back to CDP.
-  if (bridge.lastReportAt === null && !bridge.lastReportLoaded) {
-    bridge.lastReportLoaded = true
-    try {
-      const db = await getDb()
-      const row = db.select().from(settings).where(eq(settings.key, LAST_REPORT_KEY)).get()
-      if (row?.value) {
-        const ts = Date.parse(row.value)
-        if (!Number.isNaN(ts)) bridge.lastReportAt = ts
-      }
-    } catch {
-      // settings unavailable — treat as never reported
-    }
-  }
-
   return bridge.lastReportAt !== null && Date.now() - bridge.lastReportAt < maxAgeMs
 }
 
 export function recordReport(version: string, result: SyncResult): void {
   const bridge = getBridge()
   bridge.lastReportAt = Date.now()
-  bridge.lastReportLoaded = true
   bridge.lastSyncResult = result
   bridge.extensionVersion = version
-
-  // Fire-and-forget persistence
-  void (async () => {
-    try {
-      const db = await getDb()
-      const value = new Date(bridge.lastReportAt!).toISOString()
-      db.insert(settings)
-        .values({ key: LAST_REPORT_KEY, value })
-        .onConflictDoUpdate({ target: settings.key, set: { value } })
-        .run()
-    } catch {
-      // non-fatal
-    }
-  })()
 }
 
 export function addSubscriber(fn: (cmd: ExtensionCommand) => void): () => void {

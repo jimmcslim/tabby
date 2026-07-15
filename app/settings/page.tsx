@@ -13,23 +13,10 @@ import { cn } from "@/lib/utils"
 export default function SettingsPage() {
   const { chromeStatus } = useSyncContext()
 
-  const [chromeUrl, setChromeUrl] = useState(chromeStatus?.debugUrl || "http://localhost:9222")
   const [ollamaUrl, setOllamaUrl] = useState("http://localhost:11434")
-  const [chromeTestResult, setChromeTestResult] = useState<boolean | null>(null)
-  const [chromeError, setChromeError] = useState<string | null>(null)
   const [ollamaTestResult, setOllamaTestResult] = useState<boolean | null>(null)
 
-  const testChrome = useCallback(async () => {
-    try {
-      const res = await fetch("/api/chrome/status")
-      const data = await res.json()
-      setChromeTestResult(data.connected)
-      setChromeError(data.connected ? null : (data.error ?? null))
-    } catch {
-      setChromeTestResult(false)
-      setChromeError("Failed to reach the status endpoint")
-    }
-  }, [])
+  const extension = chromeStatus?.extension
 
   const testOllama = useCallback(async () => {
     try {
@@ -47,57 +34,43 @@ export default function SettingsPage() {
 
       <div className="flex-1 overflow-y-auto p-8">
         <div className="mx-auto max-w-2xl space-y-8">
-          {/* Chrome Connection */}
+          {/* Chrome Extension */}
           <section className="space-y-4">
             <div>
-              <h2 className="text-lg font-semibold">Chrome Connection</h2>
+              <h2 className="text-lg font-semibold">Chrome Extension</h2>
               <p className="text-sm text-muted-foreground">
-                Connect to Chrome via the DevTools Protocol for tab management.
+                The Tabby Connector extension provides tab state, tab actions, and previews.
               </p>
             </div>
 
-            <div className="flex items-end gap-3">
-              <div className="flex-1 space-y-1.5">
-                <label className="text-sm font-medium">Debug URL</label>
-                <Input
-                  value={chromeUrl}
-                  onChange={(e) => setChromeUrl(e.target.value)}
-                  placeholder="http://localhost:9222"
+            <div className="space-y-2 rounded-lg border bg-muted/50 p-4 text-sm">
+              <div className="flex items-center gap-2">
+                <HugeiconsIcon
+                  icon={extension?.connected ? CheckmarkCircle01Icon : Cancel01Icon}
+                  className={cn("size-4", extension?.connected ? "text-green-500" : "text-red-500")}
                 />
+                <span>{extension?.connected ? "Extension connected" : "Extension not connected"}</span>
               </div>
-              <Button variant="outline" onClick={testChrome}>
-                Test Connection
-              </Button>
+              <dl className="ml-6 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                <dt>Command stream</dt>
+                <dd>{extension?.sse ? "live" : "reconnecting"}</dd>
+                <dt>Version</dt>
+                <dd>{extension?.version ?? "—"}</dd>
+                <dt>Last report</dt>
+                <dd>{extension?.lastReportAt ? new Date(extension.lastReportAt).toLocaleString() : "never"}</dd>
+              </dl>
             </div>
 
-            {chromeTestResult !== null && (
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 text-sm">
-                  <HugeiconsIcon
-                    icon={chromeTestResult ? CheckmarkCircle01Icon : Cancel01Icon}
-                    className={cn("size-4", chromeTestResult ? "text-green-500" : "text-red-500")}
-                  />
-                  <span>{chromeTestResult ? "Connected successfully" : "Connection failed"}</span>
-                </div>
-                {!chromeTestResult && chromeError && (
-                  <p className="ml-6 text-xs text-muted-foreground">{chromeError}</p>
-                )}
+            {!extension?.connected && (
+              <div className="rounded-lg border bg-muted/50 p-4">
+                <h3 className="mb-2 text-sm font-medium">How to install</h3>
+                <ol className="list-decimal list-inside space-y-1 text-xs">
+                  <li>Open <code className="rounded bg-background px-1.5 py-0.5">chrome://extensions</code> and enable Developer mode</li>
+                  <li>Click &ldquo;Load unpacked&rdquo; and select the <code className="rounded bg-background px-1.5 py-0.5">extension/</code> folder of this repo</li>
+                  <li>Tabby connects automatically within a few seconds</li>
+                </ol>
               </div>
             )}
-
-            <div className="rounded-lg border bg-muted/50 p-4">
-              <h3 className="mb-2 text-sm font-medium">How to enable remote debugging</h3>
-              <div className="space-y-3">
-                <div>
-                  <p className="mb-1 text-xs font-medium text-muted-foreground">Chrome 144+ (recommended — uses your normal profile)</p>
-                  <ol className="list-decimal list-inside space-y-1 text-xs">
-                    <li>Open <code className="rounded bg-background px-1.5 py-0.5">chrome://inspect/#remote-debugging</code> in Chrome</li>
-                    <li>Enable remote debugging and allow connections</li>
-                    <li>Tabby will auto-connect within 30 seconds</li>
-                  </ol>
-                </div>
-              </div>
-            </div>
           </section>
 
           <Separator />

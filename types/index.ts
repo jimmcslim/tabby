@@ -5,11 +5,10 @@ export interface ChromeTab {
   url: string
   faviconUrl?: string
   windowId?: number | null
-  /** Position in the window's tab strip (extension source only) */
+  /** Position in the window's tab strip */
   tabIndex?: number | null
-  /** When the tab was last focused, ISO string (extension source only) */
+  /** When the tab was last focused, ISO string */
   lastAccessedAt?: string | null
-  webSocketDebuggerUrl?: string
   /** True when the tab is parked by a suspender (e.g. Workona) and url was unwrapped */
   suspended?: boolean
   /** Chrome unloaded the tab from memory (Memory Saver / tabs.discard), or it never loaded */
@@ -69,9 +68,8 @@ export interface ChromeStatus {
   connected: boolean
   browser?: string
   version?: string
-  debugUrl: string
   error?: string
-  source?: "extension" | "cdp" | "none"
+  source?: "extension" | "none"
   extension?: {
     connected: boolean
     sse: boolean

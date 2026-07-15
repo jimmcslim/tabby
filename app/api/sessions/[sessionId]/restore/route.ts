@@ -1,6 +1,6 @@
 import { getDb } from "@/lib/db"
 import { sessions, sessionTabs } from "@/lib/db/schema"
-import { openTab } from "@/lib/chrome/cdp"
+import { openTab } from "@/lib/chrome/actions"
 import { eq, asc } from "drizzle-orm"
 import { NextRequest, NextResponse } from "next/server"
 

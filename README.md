@@ -4,7 +4,7 @@
 
 **Chrome tab manager with AI-powered organization**
 
-Auto-discovers open tabs via the Chrome DevTools Protocol, saves browsing sessions, and uses Ollama for classification, summarization, and smart grouping.
+Auto-discovers open tabs via a companion Chrome extension, saves browsing sessions, and uses Ollama for classification, summarization, and smart grouping.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/dark-mode.png">
@@ -22,7 +22,7 @@ Auto-discovers open tabs via the Chrome DevTools Protocol, saves browsing sessio
 
 ## Features
 
-- **Auto-sync** — Polls Chrome every 30s via WebSocket CDP, tracks tab lifecycle with full history
+- **Auto-sync** — The Tabby Connector extension pushes tab changes within ~1s (debounced) plus a 30s safety sync, tracking tab lifecycle with full history
 - **Tab management** — Focus, close, reopen tabs directly from the UI
 - **Window grouping** — Tabs grouped by Chrome window with renamable window labels
 - **Sessions** — Save, restore, import/export browsing session snapshots. Auto-saves "Latest" on every sync
@@ -31,10 +31,10 @@ Auto-discovers open tabs via the Chrome DevTools Protocol, saves browsing sessio
 - **AI summarization** — Generate page summaries, auto-summarize articles on sync
 - **Reader mode** — Distraction-free article reader for long-form content
 - **Duplicate detection** — Find and close duplicate tabs across windows
-- **Stale tab detection** — Identify and suspend tabs inactive for 24+ hours
+- **Stale tab detection** — Identify tabs not used for 24+ hours and suspend them (`chrome.tabs.discard` — memory freed, tab stays put)
 - **OG image enrichment** — Auto-fetch preview images for YouTube, Twitter, LinkedIn, etc.
 - **Tweet extraction** — Fetch tweet content and author info for Twitter/X tabs
-- **Screenshots** — Capture tab screenshots via CDP with 5-minute caching
+- **Tab previews** — The extension captures the visible tab as you browse; previews build up naturally
 - **Command palette** — `Cmd+K` to search tabs, history, sessions, groups, and run actions
 - **Dark mode** — System-aware theme with toggle
 
@@ -46,21 +46,21 @@ Auto-discovers open tabs via the Chrome DevTools Protocol, saves browsing sessio
 | UI | shadcn/ui v4 (Base UI + Tailwind v4) |
 | Icons | Hugeicons |
 | Database | SQLite via Drizzle ORM + `bun:sqlite` |
-| Chrome | DevTools Protocol over WebSocket |
+| Chrome | Companion MV3 extension (snapshot push + SSE command stream) |
 | AI | Ollama (local inference) |
 | Runtime | Bun |
-| Deployment | Docker + nginx reverse proxy |
+| Deployment | Docker |
 
 ## Quick Start
 
-### 1. Enable Chrome Remote Debugging
+### 1. Install the Chrome extension
 
-In your normal Chrome — no restart, no separate profile, no flags needed:
+In your normal Chrome — no flags, no separate profile, no DevTools banner:
 
-1. Navigate to `chrome://inspect/#remote-debugging`
-2. Enable remote debugging and allow connections
+1. Open `chrome://extensions` and enable **Developer mode**
+2. Click **Load unpacked** and select this repo's [`extension/`](extension/) folder
 
-Chrome writes a `DevToolsActivePort` file that Tabby reads to connect via WebSocket.
+The extension connects to the Tabby server automatically and pins a Tabby tab to the left of every window. See [extension/README.md](extension/README.md) for details.
 
 ### 2. Run with Docker
 
@@ -85,32 +85,20 @@ Open [http://localhost:3000](http://localhost:3000). Tabs sync automatically wit
 
 ## Architecture
 
-### Chrome Connection
+### Chrome Extension
 
-Tabby uses the [Chrome DevTools Protocol](https://chromedevtools.github.io/devtools-protocol/) over WebSocket — the same mechanism used by [chrome-devtools-mcp](https://github.com/ChromeDevTools/chrome-devtools-mcp).
+Tab state and tab actions flow through the **Tabby Connector** extension ([`extension/`](extension/)), a Manifest V3 service worker:
 
-When remote debugging is enabled via `chrome://inspect/#remote-debugging`, Chrome writes a `DevToolsActivePort` file to its profile directory containing the port and WebSocket path. Tabby reads this file and maintains a persistent WebSocket connection for tab management.
-
-CDP commands used:
-- `Target.getTargets` — list all tabs
-- `Target.activateTarget` — focus a tab
-- `Target.closeTarget` — close a tab
-- `Target.createTarget` — open a new tab
-- `Target.attachToTarget` + `Page.captureScreenshot` — capture screenshots
-- `Browser.getVersion` — connection health check
-- `Browser.getWindowForTarget` — map tabs to windows
-
-### Why nginx in Docker?
-
-Chrome validates the `Host` header on WebSocket upgrade requests and silently drops connections from non-localhost origins. When Tabby runs in Docker, it reaches Chrome via `host.docker.internal` — Chrome rejects this.
-
-The nginx sidecar proxies WebSocket connections from the container to Chrome on the host, rewriting the `Host` header to `localhost:9222`. This is required for Docker; not needed when running natively.
+- **Snapshots** — `chrome.tabs`/`chrome.windows` events trigger a debounced (500ms) full-tab snapshot POST to `/api/extension/sync`, plus a 30s alarm safety sync. Snapshots include per-tab window, strip position, last-accessed time, and suspension state.
+- **Commands** — the worker holds an SSE stream open to `/api/extension/events`; the server pushes focus/close/open/discard commands instantly and receives acks on `/api/extension/ack`. Commands queued while the stream is down piggyback on the next snapshot response.
+- **Previews** — on tab activation the worker captures the visible tab (`chrome.tabs.captureVisibleTab`) and stores it via `/api/extension/screenshot`.
+- **Pinned tab** — a pinned Tabby tab is maintained at index 0 of every window, Workona-style.
 
 ### Sync Flow
 
-Every 30 seconds:
-1. Poll Chrome tabs via CDP `Target.getTargets`
-2. Diff against database — add new tabs, update existing, mark closed
+On every tab change (debounced) and at least every 30 seconds:
+1. Extension pushes a full snapshot of Chrome's tabs
+2. Diff against database — add new tabs, update existing, mark closed (URL-rebind pass survives Chrome restarts without churning history)
 3. Enrich special domains (OG images for YouTube/LinkedIn, tweet data for Twitter/X)
 4. Update the auto-saved "Latest" session
 5. Auto-classify and auto-summarize new tabs via Ollama (background, non-blocking)
@@ -149,10 +137,10 @@ AI capabilities:
 | DELETE | `/api/tabs/[tabId]` | Delete tab from database |
 | POST | `/api/tabs/sync` | Trigger Chrome sync |
 | POST | `/api/tabs/bulk` | Bulk close or delete (`{ tabIds, action }`) |
-| GET | `/api/tabs/stale` | Find tabs inactive for N hours |
-| POST | `/api/tabs/stale` | Close stale tabs |
+| GET | `/api/tabs/stale` | Find tabs not used for N hours |
+| POST | `/api/tabs/stale` | Suspend stale tabs (`chrome.tabs.discard`) |
 | GET | `/api/tabs/[tabId]/reader` | Fetch article content |
-| GET | `/api/tabs/[tabId]/screenshot` | Capture/retrieve tab screenshot |
+| GET | `/api/tabs/[tabId]/screenshot` | Serve cached tab preview (or OG image) |
 
 ### Chrome
 
@@ -164,6 +152,15 @@ AI capabilities:
 | POST | `/api/chrome/open` | Open URL in Chrome |
 | GET | `/api/chrome/close-duplicates` | Detect duplicate tabs |
 | POST | `/api/chrome/close-duplicates` | Close duplicate tabs |
+
+### Extension (called by the Tabby Connector)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/extension/sync` | Ingest a full tab snapshot; response piggybacks queued commands |
+| GET | `/api/extension/events` | SSE stream delivering commands to the extension |
+| POST | `/api/extension/ack` | Command results |
+| POST | `/api/extension/screenshot` | Store a capture of the visible tab |
 
 ### Sessions
 
@@ -235,9 +232,6 @@ Import validates: version 1, non-empty name, non-empty tabs, valid URLs (blocks 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DATABASE_PATH` | `./data/tabby.db` | SQLite database location |
-| `DEVTOOLS_PORT_FILE` | `~/Library/.../DevToolsActivePort` | Chrome debug port file |
-| `CHROME_WS_HOST` | `127.0.0.1` | WebSocket host (`chrome-proxy` in Docker) |
-| `CHROME_PROFILE_DIR` | `~/Library/.../Google/Chrome` | Chrome profile directory |
 | `OLLAMA_URL` | `http://localhost:11434` | Ollama API endpoint |
 | `OLLAMA_MODEL` | `qwen3.5:latest` | Model for AI features |
 
@@ -270,9 +264,16 @@ tabby/
 │   ├── providers/                  # Sync + theme context providers
 │   ├── ui/                         # shadcn/ui components
 │   └── command-palette.tsx         # Cmd+K palette
+├── extension/                      # Tabby Connector Chrome extension (MV3)
+│   ├── manifest.json
+│   ├── background.js               # Snapshots, SSE commands, captures, pinned tab
+│   └── popup.html / popup.js       # Status + server URL
 ├── lib/
-│   ├── chrome/cdp.ts               # Chrome DevTools Protocol client
-│   ├── chrome/sync.ts              # Tab sync logic
+│   ├── chrome/actions.ts           # Tab actions dispatched to the extension
+│   ├── chrome/sync.ts              # Tab sync/diff logic
+│   ├── chrome/workona.ts           # Workona suspended-tab URL unwrap
+│   ├── extension/bridge.ts         # SSE subscribers + command queue + acks
+│   ├── screenshots.ts              # Preview cache paths
 │   ├── db/schema.ts                # Drizzle ORM schema
 │   ├── db/index.ts                 # Database connection
 │   ├── sessions/auto-save.ts       # Auto-save "Latest" session
@@ -281,6 +282,5 @@ tabby/
 │   └── og.ts                       # OG image + tweet extraction
 ├── types/index.ts                  # TypeScript interfaces
 ├── Dockerfile                      # Multi-stage Bun build
-├── docker-compose.yml              # App + nginx proxy
-└── nginx-chrome-proxy.conf         # WebSocket Host header rewrite
+└── docker-compose.yml              # App container
 ```

@@ -39,7 +39,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       setChromeStatus(data)
       return data.connected
     } catch {
-      setChromeStatus({ connected: false, debugUrl: "http://localhost:9222" })
+      setChromeStatus({ connected: false, source: "none" })
       return false
     }
   }, [])

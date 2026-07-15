@@ -1,12 +1,9 @@
 import { getDb } from "@/lib/db"
 import { tabs } from "@/lib/db/schema"
-import { captureScreenshot, findTargetIdByUrl } from "@/lib/chrome/cdp"
+import { ensureScreenshotDir, screenshotPath } from "@/lib/screenshots"
 import { eq } from "drizzle-orm"
 import { NextRequest, NextResponse } from "next/server"
 import fs from "node:fs"
-import path from "node:path"
-
-const SCREENSHOT_DIR = path.join(process.cwd(), "data", "screenshots")
 
 function jpegResponse(data: Buffer | Uint8Array, maxAge: number) {
   return new NextResponse(new Uint8Array(data), {
@@ -17,72 +14,31 @@ function jpegResponse(data: Buffer | Uint8Array, maxAge: number) {
   })
 }
 
-function ensureDir() {
-  if (!fs.existsSync(SCREENSHOT_DIR)) {
-    fs.mkdirSync(SCREENSHOT_DIR, { recursive: true })
-  }
-}
-
-function screenshotPath(tabId: string) {
-  return path.join(SCREENSHOT_DIR, `${tabId}.jpg`)
-}
-
+/**
+ * Serves the cached tab preview. Captures arrive from the extension
+ * (POST /api/extension/screenshot) whenever a tab is activated; this route
+ * never captures. A future on-demand capture backend (Firecrawl / Playwright)
+ * would slot in here where the cache misses.
+ */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ tabId: string }> },
 ) {
   const { tabId } = await params
-  const { searchParams } = request.nextUrl
-  const refresh = searchParams.get("refresh") === "1"
 
-  ensureDir()
+  ensureScreenshotDir()
   const filePath = screenshotPath(tabId)
 
-  // Serve cached screenshot if fresh enough (< 5 min) and not forcing refresh
-  if (!refresh && fs.existsSync(filePath)) {
-    const stat = fs.statSync(filePath)
-    const ageMs = Date.now() - stat.mtimeMs
-    if (ageMs < 5 * 60 * 1000) {
-      return jpegResponse(fs.readFileSync(filePath), 300)
-    }
+  if (fs.existsSync(filePath)) {
+    return jpegResponse(fs.readFileSync(filePath), 300)
   }
 
-  // Look up tab to get chromeId
+  // No capture yet — fall back to the OG image if the tab has one
   const db = await getDb()
   const tab = db.select().from(tabs).where(eq(tabs.id, tabId)).get()
-
-  // If tab has an OG image, redirect to it
   if (tab?.ogImage) {
     return NextResponse.redirect(tab.ogImage, { status: 302 })
   }
 
-  if (!tab || !tab.chromeId || tab.status !== "open") {
-    // Serve stale cached version if available
-    if (fs.existsSync(filePath)) {
-      return jpegResponse(fs.readFileSync(filePath), 60)
-    }
-    return NextResponse.json({ error: "Tab not available" }, { status: 404 })
-  }
-
-  try {
-    // Extension-sourced tabs don't carry a CDP targetId — resolve one by URL.
-    // Screenshots are the one feature still requiring the CDP debug port.
-    let targetId = tab.chromeId
-    if (targetId.startsWith("ext:")) {
-      const found = await findTargetIdByUrl(tab.url)
-      if (!found) throw new Error("No CDP target for tab URL")
-      targetId = found
-    }
-
-    const buffer = await captureScreenshot(targetId)
-    fs.writeFileSync(filePath, buffer)
-    return jpegResponse(buffer, 300)
-  } catch (error) {
-    // Serve stale cached version on error
-    if (fs.existsSync(filePath)) {
-      return jpegResponse(fs.readFileSync(filePath), 60)
-    }
-    const message = error instanceof Error ? error.message : "Screenshot failed"
-    return NextResponse.json({ error: message }, { status: 502 })
-  }
+  return NextResponse.json({ error: "No screenshot available" }, { status: 404 })
 }
