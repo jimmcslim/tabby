@@ -658,19 +658,21 @@ export default function DashboardPage() {
       {view === "card" && !loading && tabs.length > 0 && (
         <div className="fixed bottom-6 right-8 z-40 flex items-center gap-2.5 rounded-full border bg-background/80 py-2 pl-3.5 pr-4 shadow-lg backdrop-blur-md">
           <HugeiconsIcon icon={MinusSignIcon} className="size-3.5 shrink-0 text-muted-foreground" />
-          <Slider
-            aria-label="Card zoom"
-            className="w-36"
-            min={4}
-            max={16}
-            step={1}
-            // Inverted: slider right = zoom in (fewer, larger cards)
-            value={[20 - gridCols]}
-            onValueChange={(value) => {
-              const v = Array.isArray(value) ? value[0] : value
-              setGridCols(20 - v)
-            }}
-          />
+          <div className="w-64">
+            <Slider
+              aria-label="Card zoom"
+              min={8}
+              max={16}
+              step={1}
+              // Inverted: slider right = zoom in (fewer, larger cards).
+              // cols = 20 - value, so 16 -> 4 cols (default), 8 -> 12 cols.
+              value={[20 - gridCols]}
+              onValueChange={(value) => {
+                const v = Array.isArray(value) ? value[0] : value
+                setGridCols(20 - v)
+              }}
+            />
+          </div>
           <HugeiconsIcon icon={PlusSignIcon} className="size-3.5 shrink-0 text-muted-foreground" />
         </div>
       )}
