@@ -657,7 +657,15 @@ export default function DashboardPage() {
 
       {view === "card" && !loading && tabs.length > 0 && (
         <div className="fixed bottom-6 right-8 z-40 flex items-center gap-2.5 rounded-full border bg-background/80 py-2 pl-3.5 pr-4 shadow-lg backdrop-blur-md">
-          <HugeiconsIcon icon={MinusSignIcon} className="size-3.5 shrink-0 text-muted-foreground" />
+          <button
+            className="shrink-0 rounded-full p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+            onClick={() => setGridCols((c) => Math.min(c + 1, 12))}
+            disabled={gridCols >= 12}
+            title="Zoom out"
+            aria-label="Zoom out"
+          >
+            <HugeiconsIcon icon={MinusSignIcon} className="size-3.5" />
+          </button>
           <div className="w-64">
             <Slider
               aria-label="Card zoom"
@@ -673,7 +681,15 @@ export default function DashboardPage() {
               }}
             />
           </div>
-          <HugeiconsIcon icon={PlusSignIcon} className="size-3.5 shrink-0 text-muted-foreground" />
+          <button
+            className="shrink-0 rounded-full p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+            onClick={() => setGridCols((c) => Math.max(c - 1, 4))}
+            disabled={gridCols <= 4}
+            title="Zoom in"
+            aria-label="Zoom in"
+          >
+            <HugeiconsIcon icon={PlusSignIcon} className="size-3.5" />
+          </button>
         </div>
       )}
 
