@@ -13,11 +13,20 @@ interface TabGridProps {
   onTabClick: (tab: Tab) => void
   onReopen?: (tabId: string) => void
   onReadArticle?: (tab: Tab) => void
+  /** Fixed column count (zoom); omit for the default responsive grid */
+  columns?: number
 }
 
-export function TabGrid({ tabs, selectedIds, onSelect, onFocus, onClose, onClassify, onTabClick, onReopen, onReadArticle }: TabGridProps) {
+export function TabGrid({ tabs, selectedIds, onSelect, onFocus, onClose, onClassify, onTabClick, onReopen, onReadArticle, columns }: TabGridProps) {
   return (
-    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+    <div
+      className={
+        columns
+          ? `grid ${columns > 8 ? "gap-3" : "gap-5"}`
+          : "grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4"
+      }
+      style={columns ? { gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` } : undefined}
+    >
       {tabs.map((tab) => (
         <TabCard
           key={tab.id}
