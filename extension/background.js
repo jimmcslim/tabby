@@ -113,12 +113,16 @@ async function executeCommand(command) {
         break
       }
       case "open": {
-        const tab = await chrome.tabs.create({ url: command.url })
+        const createProps = {}
+        if (command.url) createProps.url = command.url
+        if (command.windowId) createProps.windowId = command.windowId
+        const tab = await chrome.tabs.create(createProps)
+        if (command.windowId) await chrome.windows.update(tab.windowId, { focused: true })
         ack.data = {
           id: "ext:" + tab.id,
           windowId: tab.windowId,
-          url: tab.pendingUrl || tab.url || command.url,
-          title: tab.title || command.url,
+          url: tab.pendingUrl || tab.url || command.url || "chrome://newtab/",
+          title: tab.title || command.url || "New tab",
         }
         break
       }

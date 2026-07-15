@@ -2,6 +2,8 @@
 
 import type { Tab } from "@/types"
 import { TabCard } from "./tab-card"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { PlusSignIcon } from "@hugeicons/core-free-icons"
 
 interface TabGridProps {
   tabs: Tab[]
@@ -15,9 +17,11 @@ interface TabGridProps {
   onReadArticle?: (tab: Tab) => void
   /** Fixed column count (zoom); omit for the default responsive grid */
   columns?: number
+  /** When set, renders a trailing empty card whose + button opens a new tab */
+  onAddTab?: () => void
 }
 
-export function TabGrid({ tabs, selectedIds, onSelect, onFocus, onClose, onClassify, onTabClick, onReopen, onReadArticle, columns }: TabGridProps) {
+export function TabGrid({ tabs, selectedIds, onSelect, onFocus, onClose, onClassify, onTabClick, onReopen, onReadArticle, columns, onAddTab }: TabGridProps) {
   return (
     <div
       className={
@@ -41,6 +45,15 @@ export function TabGrid({ tabs, selectedIds, onSelect, onFocus, onClose, onClass
           onReadArticle={onReadArticle}
         />
       ))}
+      {onAddTab && (
+        <button
+          className="flex min-h-32 items-center justify-center rounded-2xl border border-dashed border-border/60 text-muted-foreground/60 transition-colors hover:border-border hover:bg-muted/30 hover:text-foreground"
+          onClick={onAddTab}
+          title="Open a new tab in this window"
+        >
+          <HugeiconsIcon icon={PlusSignIcon} className="size-8" />
+        </button>
+      )}
     </div>
   )
 }

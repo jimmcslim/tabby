@@ -88,6 +88,8 @@ export interface ExtensionCommand {
   /** Numeric chrome.tabs id (chromeId with the "ext:" prefix stripped) */
   tabId?: number
   url?: string
+  /** Target chrome.windows id for "open" */
+  windowId?: number
 }
 
 /** POST body the extension sends to /api/extension/ack */

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Tabby Connector",
   "description": "Pushes Chrome tab state to the Tabby app and executes tab actions — no DevTools attachment needed.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "background": {
     "service_worker": "background.js"
   },

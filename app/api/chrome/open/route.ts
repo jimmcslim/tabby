@@ -6,26 +6,27 @@ import { NextRequest, NextResponse } from "next/server"
 
 export async function POST(request: NextRequest) {
   const db = await getDb()
-  const { url } = await request.json()
-
-  if (!url) {
-    return NextResponse.json({ error: "URL is required" }, { status: 400 })
-  }
+  const { url, windowId } = await request.json()
 
   try {
-    const chromeTab = await openTab(url)
+    const chromeTab = await openTab(
+      url || undefined,
+      typeof windowId === "number" ? windowId : undefined,
+    )
     const now = new Date().toISOString()
+    const finalUrl = chromeTab.url || url || "chrome://newtab/"
     const domain = (() => {
-      try { return new URL(url).hostname } catch { return null }
+      try { return new URL(finalUrl).hostname } catch { return null }
     })()
 
     const newTab = {
       id: nanoid(),
       chromeId: chromeTab.id,
-      url: chromeTab.url || url,
-      title: chromeTab.title || url,
+      url: finalUrl,
+      title: chromeTab.title || finalUrl,
       domain,
       faviconUrl: chromeTab.faviconUrl || null,
+      windowId: chromeTab.windowId ?? null,
       status: "open" as const,
       type: "page",
       firstSeenAt: now,

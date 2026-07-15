@@ -35,9 +35,9 @@ export async function closeTab(chromeId: string): Promise<void> {
   await cdp.closeTab(chromeId)
 }
 
-export async function openTab(url: string): Promise<ChromeTab> {
+export async function openTab(url?: string, windowId?: number): Promise<ChromeTab> {
   if (isExtensionSseConnected()) {
-    const data = (await dispatchCommand({ type: "open", url })) as {
+    const data = (await dispatchCommand({ type: "open", url, windowId })) as {
       id: string
       windowId?: number
       url?: string
@@ -46,10 +46,11 @@ export async function openTab(url: string): Promise<ChromeTab> {
     return {
       id: data.id,
       type: "page",
-      title: data.title || url,
-      url: data.url || url,
+      title: data.title || data.url || url || "New tab",
+      url: data.url || url || "chrome://newtab/",
       windowId: data.windowId ?? null,
     }
   }
-  return cdp.openTab(url)
+  // CDP can't target a window and needs a URL
+  return cdp.openTab(url || "chrome://newtab/")
 }

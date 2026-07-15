@@ -372,6 +372,19 @@ export default function DashboardPage() {
     setDetailTab(updated)
   }, [])
 
+  const handleAddTab = useCallback(async (windowId: number) => {
+    const res = await fetch("/api/chrome/open", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ windowId }),
+    })
+    if (res.ok) {
+      fetchTabs()
+    } else {
+      toast.error("Failed to open tab")
+    }
+  }, [fetchTabs])
+
   const handleCheckDuplicates = useCallback(async () => {
     const res = await fetch("/api/chrome/close-duplicates")
     if (res.ok) {
@@ -610,6 +623,11 @@ export default function DashboardPage() {
                   <TabGrid
                     tabs={group.tabs}
                     columns={gridCols}
+                    onAddTab={
+                      groupBy === "window" && group.key !== "__unknown"
+                        ? () => handleAddTab(Number(group.key))
+                        : undefined
+                    }
                     selectedIds={selectedIds}
                     onSelect={handleSelect}
                     onFocus={handleFocus}
