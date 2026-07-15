@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import type { Tab } from "@/types"
 import { FaviconImage } from "@/components/shared/favicon-image"
 import { CategoryBadge } from "@/components/shared/category-badge"
@@ -100,6 +100,16 @@ function ScreenshotPreview({ tab }: { tab: Tab }) {
     [tab.domain, tab.description],
   )
 
+  // The extension captures a tab whenever it's activated, i.e. whenever
+  // lastAccessedAt moves — version the URL with it so the browser refetches
+  // fresh captures, and clear a stale error (e.g. a 404 before first capture).
+  const screenshotSrc = `/api/tabs/${tab.id}/screenshot${
+    tab.lastAccessedAt ? `?v=${encodeURIComponent(tab.lastAccessedAt)}` : ""
+  }`
+  useEffect(() => {
+    setError(false)
+  }, [screenshotSrc])
+
   // Render tweet card
   if (tweet) return <TweetPreview tweet={tweet} />
 
@@ -128,7 +138,8 @@ function ScreenshotPreview({ tab }: { tab: Tab }) {
 
   return (
     <img
-      src={`/api/tabs/${tab.id}/screenshot`}
+      key={screenshotSrc}
+      src={screenshotSrc}
       alt=""
       className="size-full object-cover object-top"
       loading="lazy"
