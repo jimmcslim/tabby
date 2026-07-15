@@ -35,6 +35,22 @@ export async function closeTab(chromeId: string): Promise<void> {
   await cdp.closeTab(chromeId)
 }
 
+/**
+ * Suspend a tab via chrome.tabs.discard — frees its memory but keeps it in
+ * the tab strip. Extension-only (CDP has no discard). Returns the tab's new
+ * chromeId (discarding replaces the tab, so Chrome assigns a new id).
+ */
+export async function discardTab(chromeId: string): Promise<string | null> {
+  if (!chromeId.startsWith(EXT_PREFIX)) {
+    throw new Error("Suspending tabs requires the Tabby extension")
+  }
+  requireExtension()
+  const data = (await dispatchCommand({ type: "discard", tabId: extTabId(chromeId) })) as
+    | { id?: string }
+    | undefined
+  return data?.id ?? null
+}
+
 export async function openTab(url?: string, windowId?: number): Promise<ChromeTab> {
   if (isExtensionSseConnected()) {
     const data = (await dispatchCommand({ type: "open", url, windowId })) as {

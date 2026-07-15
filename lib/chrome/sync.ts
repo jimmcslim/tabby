@@ -11,7 +11,7 @@ import {
   isExtensionFresh,
   dispatchCommand,
 } from "@/lib/extension/bridge"
-import type { ChromeTab, SyncResult } from "@/types"
+import type { ChromeTab, SyncResult, TabSuspendedState } from "@/types"
 
 function extractDomain(url: string): string | null {
   try {
@@ -19,6 +19,13 @@ function extractDomain(url: string): string | null {
   } catch {
     return null
   }
+}
+
+function suspendedStateOf(t: ChromeTab): TabSuspendedState | null {
+  if (t.suspended) return "suspender"
+  if (t.discarded) return "discarded"
+  if (t.frozen) return "frozen"
+  return null
 }
 
 function isSyncResult(data: unknown): data is SyncResult {
@@ -111,6 +118,7 @@ export async function syncTabsFromList(chromeTabs: ChromeTab[]): Promise<SyncRes
           tabIndex: chromeTab.tabIndex ?? null,
           // CDP doesn't report focus times — keep the last extension-provided value
           lastAccessedAt: chromeTab.lastAccessedAt ?? existing.lastAccessedAt,
+          suspendedState: suspendedStateOf(chromeTab),
           lastSeenAt: now,
           updatedAt: now,
         })
@@ -141,6 +149,7 @@ export async function syncTabsFromList(chromeTabs: ChromeTab[]): Promise<SyncRes
           windowId: chromeTab.windowId ?? null,
           tabIndex: chromeTab.tabIndex ?? null,
           lastAccessedAt: chromeTab.lastAccessedAt ?? null,
+          suspendedState: suspendedStateOf(chromeTab),
           status: "open",
           type: chromeTab.type,
           firstSeenAt: now,

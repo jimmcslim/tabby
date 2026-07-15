@@ -11,6 +11,7 @@ import {
   ArrowReloadHorizontalIcon,
   GlassesIcon,
   MoreHorizontalIcon,
+  SleepingIcon,
 } from "@hugeicons/core-free-icons"
 import { isArticleTab } from "@/components/tabs/reader-sheet"
 
@@ -74,6 +75,11 @@ export function TabList({ tabs, selectedIds, onSelect, onFocus, onClose, onClass
 
             <FaviconImage url={tab.faviconUrl} domain={tab.domain} size={20} className="shrink-0" />
 
+            {tab.suspendedState && (
+              <span title="Suspended" className="shrink-0">
+                <HugeiconsIcon icon={SleepingIcon} className="size-3.5 text-muted-foreground/60" />
+              </span>
+            )}
             <span className="min-w-0 flex-1 truncate text-sm font-medium">
               {tab.title || tab.url}
             </span>

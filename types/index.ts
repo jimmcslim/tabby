@@ -12,7 +12,13 @@ export interface ChromeTab {
   webSocketDebuggerUrl?: string
   /** True when the tab is parked by a suspender (e.g. Workona) and url was unwrapped */
   suspended?: boolean
+  /** Chrome unloaded the tab from memory (Memory Saver / tabs.discard), or it never loaded */
+  discarded?: boolean
+  /** Chrome froze the tab's JS execution (Chrome 132+) */
+  frozen?: boolean
 }
+
+export type TabSuspendedState = "suspender" | "discarded" | "frozen"
 
 export interface Tab {
   id: string
@@ -30,6 +36,7 @@ export interface Tab {
   windowId: number | null
   tabIndex: number | null
   lastAccessedAt: string | null
+  suspendedState: TabSuspendedState | null
   isArticle: boolean | null
   isPinned: boolean
   firstSeenAt: string
@@ -84,7 +91,7 @@ export interface ExtensionSnapshot {
 /** Command the server pushes to the extension (SSE or sync-response backlog) */
 export interface ExtensionCommand {
   id: string
-  type: "focus" | "close" | "open" | "snapshot"
+  type: "focus" | "close" | "open" | "discard" | "snapshot"
   /** Numeric chrome.tabs id (chromeId with the "ext:" prefix stripped) */
   tabId?: number
   url?: string

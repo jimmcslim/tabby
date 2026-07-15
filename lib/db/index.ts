@@ -115,6 +115,12 @@ async function initDb(): Promise<DB> {
     // column already exists
   }
 
+  try {
+    sqlite.exec(`ALTER TABLE tabs ADD COLUMN suspended_state TEXT`)
+  } catch {
+    // column already exists
+  }
+
   return drizzle(sqlite, { schema: s })
 }
 

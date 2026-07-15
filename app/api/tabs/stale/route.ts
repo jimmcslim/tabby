@@ -1,10 +1,14 @@
 import { getDb } from "@/lib/db"
 import { tabs } from "@/lib/db/schema"
-import { closeTab } from "@/lib/chrome/cdp"
-import { eq, and, lt } from "drizzle-orm"
+import { discardTab } from "@/lib/chrome/actions"
+import { eq, and, lt, isNull, sql } from "drizzle-orm"
 import { NextRequest, NextResponse } from "next/server"
 
-/** GET: find tabs that haven't been seen/updated in a while */
+/**
+ * GET: find open tabs not focused in a while. Uses lastAccessedAt (real focus
+ * time from the extension) — lastSeenAt is refreshed on every sync so it can
+ * never go stale. Already-suspended tabs are excluded.
+ */
 export async function GET(request: NextRequest) {
   const db = await getDb()
   const hours = parseInt(request.nextUrl.searchParams.get("hours") || "24", 10)
@@ -13,13 +17,19 @@ export async function GET(request: NextRequest) {
   const staleTabs = db
     .select()
     .from(tabs)
-    .where(and(eq(tabs.status, "open"), lt(tabs.lastSeenAt, cutoff)))
+    .where(
+      and(
+        eq(tabs.status, "open"),
+        isNull(tabs.suspendedState),
+        lt(sql`COALESCE(${tabs.lastAccessedAt}, ${tabs.firstSeenAt})`, cutoff),
+      ),
+    )
     .all()
 
   return NextResponse.json({ tabs: staleTabs, count: staleTabs.length, hours })
 }
 
-/** POST: close stale tabs */
+/** POST: suspend stale tabs (chrome.tabs.discard — kept open, memory freed) */
 export async function POST(request: NextRequest) {
   const db = await getDb()
   const { tabIds } = await request.json()
@@ -29,23 +39,27 @@ export async function POST(request: NextRequest) {
   }
 
   const now = new Date().toISOString()
-  let closed = 0
+  let suspended = 0
 
   for (const tabId of tabIds) {
     const tab = db.select().from(tabs).where(eq(tabs.id, tabId)).get()
-    if (!tab || tab.status !== "open") continue
+    if (!tab || tab.status !== "open" || !tab.chromeId) continue
 
     try {
-      if (tab.chromeId) await closeTab(tab.chromeId)
+      const newChromeId = await discardTab(tab.chromeId)
       db.update(tabs)
-        .set({ status: "closed", closedAt: now, chromeId: null, updatedAt: now })
+        .set({
+          chromeId: newChromeId ?? tab.chromeId,
+          suspendedState: "discarded",
+          updatedAt: now,
+        })
         .where(eq(tabs.id, tab.id))
         .run()
-      closed++
+      suspended++
     } catch {
-      // skip tabs that fail
+      // skip tabs that fail (active tab, extension offline, ...)
     }
   }
 
-  return NextResponse.json({ closed })
+  return NextResponse.json({ suspended })
 }

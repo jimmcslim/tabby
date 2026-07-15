@@ -33,6 +33,8 @@ function tabToChromeTab(t) {
     windowId: t.windowId,
     tabIndex: t.index,
     lastAccessedAt: t.lastAccessed ? new Date(t.lastAccessed).toISOString() : null,
+    discarded: t.discarded || t.status === "unloaded",
+    frozen: !!t.frozen,
   }
 }
 
@@ -86,6 +88,7 @@ chrome.tabs.onMoved.addListener(scheduleSnapshot)
 chrome.tabs.onActivated.addListener(scheduleSnapshot)
 chrome.tabs.onAttached.addListener(scheduleSnapshot)
 chrome.tabs.onDetached.addListener(scheduleSnapshot)
+chrome.tabs.onReplaced.addListener(scheduleSnapshot) // fires when a tab is discarded
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   if (changeInfo.url || changeInfo.title || changeInfo.status === "complete") {
     scheduleSnapshot()
@@ -124,6 +127,12 @@ async function executeCommand(command) {
           url: tab.pendingUrl || tab.url || command.url || "chrome://newtab/",
           title: tab.title || command.url || "New tab",
         }
+        break
+      }
+      case "discard": {
+        // Discarding replaces the tab — Chrome assigns it a new tab id
+        const tab = await chrome.tabs.discard(command.tabId)
+        ack.data = tab ? { id: "ext:" + tab.id } : {}
         break
       }
       case "snapshot": {

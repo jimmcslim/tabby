@@ -431,8 +431,8 @@ export default function DashboardPage() {
         body: JSON.stringify({ tabIds: staleTabs.map((t) => t.id) }),
       })
       if (res.ok) {
-        const { closed } = await res.json()
-        toast.success(`Suspended ${closed} stale tab${closed !== 1 ? "s" : ""}`)
+        const { suspended } = await res.json()
+        toast.success(`Suspended ${suspended} stale tab${suspended !== 1 ? "s" : ""}`)
         fetchTabs()
       } else {
         toast.error("Failed to suspend tabs")

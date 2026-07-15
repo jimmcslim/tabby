@@ -14,6 +14,7 @@ import {
   ArrowReloadHorizontalIcon,
   GlassesIcon,
   MoreHorizontalIcon,
+  SleepingIcon,
 } from "@hugeicons/core-free-icons"
 import { isArticleTab } from "@/components/tabs/reader-sheet"
 
@@ -245,9 +246,16 @@ export function TabCard({ tab, isSelected, onSelect, onFocus, onClose, onClassif
           className="mt-0.5 shrink-0"
         />
         <div className="min-w-0 flex-1">
-          <h3 className="truncate text-sm font-semibold leading-snug">
-            {tab.title || tab.url}
-          </h3>
+          <div className="flex items-center gap-1.5">
+            {tab.suspendedState && (
+              <span title="Suspended" className="shrink-0">
+                <HugeiconsIcon icon={SleepingIcon} className="size-3.5 text-muted-foreground/70" />
+              </span>
+            )}
+            <h3 className="min-w-0 truncate text-sm font-semibold leading-snug">
+              {tab.title || tab.url}
+            </h3>
+          </div>
           <p className="mt-0.5 truncate text-xs text-muted-foreground">
             {tab.domain || tab.url}
           </p>
