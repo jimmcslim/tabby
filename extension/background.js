@@ -23,6 +23,21 @@ async function getBaseUrl() {
 
 // --- Snapshot push -----------------------------------------------------------
 
+// Tabby's own UI (the pinned tab, or any tab on the server origin) should not
+// appear in the tab list it manages.
+function isTabbyTab(t, baseUrl) {
+  const url = t.url || t.pendingUrl || ""
+  if (!url) return false
+  try {
+    const u = new URL(url)
+    const b = new URL(baseUrl)
+    const norm = (h) => (h === "127.0.0.1" ? "localhost" : h)
+    return u.protocol === b.protocol && norm(u.hostname) === norm(b.hostname) && u.port === b.port
+  } catch {
+    return false
+  }
+}
+
 function tabToChromeTab(t) {
   return {
     id: "ext:" + t.id,
@@ -47,7 +62,9 @@ async function pushSnapshot() {
   try {
     const baseUrl = await getBaseUrl()
     const allTabs = await chrome.tabs.query({})
-    const tabs = allTabs.filter((t) => t.id !== chrome.tabs.TAB_ID_NONE && t.url).map(tabToChromeTab)
+    const tabs = allTabs
+      .filter((t) => t.id !== chrome.tabs.TAB_ID_NONE && t.url && !isTabbyTab(t, baseUrl))
+      .map(tabToChromeTab)
 
     const res = await fetch(baseUrl + "/api/extension/sync", {
       method: "POST",
@@ -118,6 +135,7 @@ async function captureActiveTab() {
   try {
     const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true })
     if (!tab || !tab.url || !/^https?:/i.test(tab.url) || tab.discarded) return
+    if (isTabbyTab(tab, await getBaseUrl())) return
 
     const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
       format: "jpeg",
