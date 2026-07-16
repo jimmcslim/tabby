@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { Tab } from "@/types"
-import { type GroupBy, type SortBy, type TabGroup, groupTabs, sortTabs } from "@/lib/tabs/grouping"
+import { type GroupBy, type SortBy, type SortDir, type TabGroup, groupTabs, sortTabs } from "@/lib/tabs/grouping"
 import { useSyncContext } from "@/components/providers/sync-provider"
 import { Header } from "@/components/layout/header"
 import { TabGrid } from "@/components/tabs/tab-grid"
@@ -37,6 +37,8 @@ import {
   ArrowDown01Icon,
   ArrowUpDoubleIcon,
   ArrowDownDoubleIcon,
+  SortByUp01Icon,
+  SortByDown01Icon,
 } from "@hugeicons/core-free-icons"
 import { toast } from "sonner"
 
@@ -48,6 +50,7 @@ export default function DashboardPage() {
   const [detailTab, setDetailTab] = useState<Tab | null>(null)
   const [groupBy, setGroupBy] = useState<GroupBy>("window")
   const [sortBy, setSortBy] = useState<SortBy>("browser")
+  const [sortDir, setSortDir] = useState<SortDir>("asc")
   const [view, setView] = useState<"card" | "list">("card")
   // Cards per row in card view: 4 (max zoom in, default) to 16 (max zoom out)
   const [gridCols, setGridCols] = useState(4)
@@ -340,9 +343,9 @@ export default function DashboardPage() {
     () =>
       groupTabs(tabs, groupBy, windowNames).map((g) => ({
         ...g,
-        tabs: sortTabs(g.tabs, sortBy),
+        tabs: sortTabs(g.tabs, sortBy, sortDir),
       })),
-    [tabs, groupBy, windowNames, sortBy],
+    [tabs, groupBy, windowNames, sortBy, sortDir],
   )
   const notConnected = chromeStatus && !chromeStatus.connected
   const hasUnclassified = tabs.some((t) => !t.category)
@@ -390,13 +393,23 @@ export default function DashboardPage() {
             </SelectTrigger>
             <SelectContent align="end" alignItemWithTrigger={false}>
               <SelectItem value="browser">Browser order</SelectItem>
-              <SelectItem value="lastAccessed">Recently used</SelectItem>
-              <SelectItem value="oldest">Oldest first</SelectItem>
-              <SelectItem value="newest">Newest first</SelectItem>
+              <SelectItem value="lastAccessed">Last active</SelectItem>
+              <SelectItem value="dateAdded">Date added</SelectItem>
               <SelectItem value="title">Title</SelectItem>
               <SelectItem value="domain">Domain</SelectItem>
             </SelectContent>
           </Select>
+        )}
+        {tabs.length > 0 && (
+          <Button
+            variant="outline"
+            size="icon-sm"
+            onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
+            title={sortDir === "asc" ? "Sort ascending" : "Sort descending"}
+            aria-label={sortDir === "asc" ? "Sort ascending" : "Sort descending"}
+          >
+            <HugeiconsIcon icon={sortDir === "asc" ? SortByUp01Icon : SortByDown01Icon} className="size-4" />
+          </Button>
         )}
         {tabs.length > 0 && (
           <Button variant="outline" onClick={handleCheckStale}>

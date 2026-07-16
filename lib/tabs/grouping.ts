@@ -1,7 +1,8 @@
 import type { Tab } from "@/types"
 
 export type GroupBy = "window" | "category" | "domain" | "none"
-export type SortBy = "browser" | "lastAccessed" | "oldest" | "newest" | "title" | "domain"
+export type SortBy = "browser" | "lastAccessed" | "dateAdded" | "title" | "domain"
+export type SortDir = "asc" | "desc"
 
 export interface TabGroup {
   key: string // raw key for identification (e.g. windowId "1382002407")
@@ -10,26 +11,37 @@ export interface TabGroup {
   tabs: Tab[]
 }
 
-// Applied within each group. tabIndex/lastAccessedAt only exist for
-// extension-sourced tabs; both sorts fall back to first-seen order.
-export function sortTabs(tabs: Tab[], sortBy: SortBy): Tab[] {
+// Ascending form of each criterion; sortTabs negates it for descending.
+// tabIndex/lastAccessedAt only exist for extension-sourced tabs, so both
+// fall back to first-seen order.
+function compareAscending(a: Tab, b: Tab, sortBy: SortBy): number {
   const byFirstSeen = (a: Tab, b: Tab) => a.firstSeenAt.localeCompare(b.firstSeenAt)
-  const cmp: (a: Tab, b: Tab) => number = {
-    browser: (a: Tab, b: Tab) =>
-      (a.windowId ?? Number.MAX_SAFE_INTEGER) - (b.windowId ?? Number.MAX_SAFE_INTEGER) ||
-      (a.tabIndex ?? Number.MAX_SAFE_INTEGER) - (b.tabIndex ?? Number.MAX_SAFE_INTEGER) ||
-      byFirstSeen(a, b),
-    lastAccessed: (a: Tab, b: Tab) =>
-      (b.lastAccessedAt ?? "").localeCompare(a.lastAccessedAt ?? "") || -byFirstSeen(a, b),
-    oldest: byFirstSeen,
-    newest: (a: Tab, b: Tab) => -byFirstSeen(a, b),
-    title: (a: Tab, b: Tab) =>
-      (a.title || a.url).localeCompare(b.title || b.url, undefined, { sensitivity: "base" }),
-    domain: (a: Tab, b: Tab) =>
-      (a.domain || "").localeCompare(b.domain || "") ||
-      (a.title || a.url).localeCompare(b.title || b.url, undefined, { sensitivity: "base" }),
-  }[sortBy]
-  return [...tabs].sort(cmp)
+  switch (sortBy) {
+    case "browser":
+      return (
+        (a.windowId ?? Number.MAX_SAFE_INTEGER) - (b.windowId ?? Number.MAX_SAFE_INTEGER) ||
+        (a.tabIndex ?? Number.MAX_SAFE_INTEGER) - (b.tabIndex ?? Number.MAX_SAFE_INTEGER) ||
+        byFirstSeen(a, b)
+      )
+    case "lastAccessed":
+      return (a.lastAccessedAt ?? "").localeCompare(b.lastAccessedAt ?? "") || byFirstSeen(a, b)
+    case "dateAdded":
+      return byFirstSeen(a, b)
+    case "title":
+      return (a.title || a.url).localeCompare(b.title || b.url, undefined, { sensitivity: "base" })
+    case "domain":
+      return (
+        (a.domain || "").localeCompare(b.domain || "") ||
+        (a.title || a.url).localeCompare(b.title || b.url, undefined, { sensitivity: "base" })
+      )
+  }
+}
+
+// Applied within each group; grouping and sorting are independent, so the
+// same sortBy/sortDir apply uniformly across every group.
+export function sortTabs(tabs: Tab[], sortBy: SortBy, sortDir: SortDir): Tab[] {
+  const sign = sortDir === "desc" ? -1 : 1
+  return [...tabs].sort((a, b) => sign * compareAscending(a, b, sortBy))
 }
 
 export function groupTabs(
