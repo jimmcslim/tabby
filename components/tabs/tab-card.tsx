@@ -17,6 +17,7 @@ import {
   SleepingIcon,
 } from "@hugeicons/core-free-icons"
 import { isArticleTab } from "@/components/tabs/reader-sheet"
+import { shouldPreferOgImage } from "@/lib/og"
 
 const TWEET_DOMAINS = new Set(["twitter.com", "x.com", "mobile.twitter.com", "mobile.x.com"])
 
@@ -113,8 +114,10 @@ function ScreenshotPreview({ tab }: { tab: Tab }) {
   // Render tweet card
   if (tweet) return <TweetPreview tweet={tweet} />
 
-  // Use OG image if available (works for both open and closed tabs)
-  if (tab.ogImage && !error) {
+  // On OG-preferred domains (YouTube, Reddit, ...) the declared artwork beats
+  // a viewport capture; everywhere else prefer the live capture — the server
+  // falls back to the OG image itself when no capture exists.
+  if (tab.ogImage && shouldPreferOgImage(tab.domain) && !error) {
     return (
       <div className="flex size-full items-center justify-center bg-muted/30">
         <img
@@ -128,7 +131,7 @@ function ScreenshotPreview({ tab }: { tab: Tab }) {
     )
   }
 
-  if (tab.status !== "open" || error) {
+  if (error) {
     return (
       <div className="flex items-center justify-center bg-muted/50">
         <HugeiconsIcon icon={Image01Icon} className="size-8 text-muted-foreground/30" />

@@ -3,7 +3,7 @@ import { tabs } from "@/lib/db/schema"
 import { eq } from "drizzle-orm"
 import { nanoid } from "nanoid"
 import { updateAutoSession } from "@/lib/sessions/auto-save"
-import { shouldPreferOgImage, fetchOgImage, isTweetUrl, fetchTweetData } from "@/lib/og"
+import { fetchOgImage, isTweetUrl, fetchTweetData } from "@/lib/og"
 import { getBridge, isExtensionSseConnected, dispatchCommand } from "@/lib/extension/bridge"
 import type { ChromeTab, SyncResult, TabSuspendedState } from "@/types"
 
@@ -108,13 +108,13 @@ export async function syncTabsFromList(chromeTabs: ChromeTab[]): Promise<SyncRes
         .where(eq(tabs.id, existing.id))
         .run()
 
-      // Queue enrichment
+      // Queue enrichment: OG images for any http(s) tab never checked
+      // (ogImage null; "" means checked-and-none) or whose URL changed.
       if (isTweetUrl(domain) && !existing.description) {
         tweetFetchQueue.push({ id: existing.id, url: chromeTab.url })
       } else if (
-        existing.url !== chromeTab.url &&
-        !existing.ogImage &&
-        (shouldPreferOgImage(domain) || chromeTab.suspended)
+        /^https?:/i.test(chromeTab.url) &&
+        (existing.ogImage === null || existing.url !== chromeTab.url)
       ) {
         ogFetchQueue.push({ id: existing.id, url: chromeTab.url })
       }
@@ -144,7 +144,7 @@ export async function syncTabsFromList(chromeTabs: ChromeTab[]): Promise<SyncRes
 
       if (isTweetUrl(domain)) {
         tweetFetchQueue.push({ id, url: chromeTab.url })
-      } else if (shouldPreferOgImage(domain) || chromeTab.suspended) {
+      } else if (/^https?:/i.test(chromeTab.url)) {
         ogFetchQueue.push({ id, url: chromeTab.url })
       }
       added++
@@ -165,20 +165,24 @@ export async function syncTabsFromList(chromeTabs: ChromeTab[]): Promise<SyncRes
 
   await updateAutoSession()
 
-  // Fetch OG images and tweet data in the background (non-blocking)
+  // Fetch OG images and tweet data in the background (non-blocking).
+  // OG fetches are capped per sync so a large backlog (e.g. first sync of
+  // hundreds of tabs) drains gradually; unfetched tabs still have ogImage
+  // null and re-queue next sync. "" records checked-but-none so sites
+  // without OG tags aren't refetched forever.
+  const OG_FETCH_LIMIT = 15
+  const ogBatch = ogFetchQueue.slice(0, OG_FETCH_LIMIT)
   const enrichPromises: Promise<unknown>[] = []
 
-  if (ogFetchQueue.length > 0) {
+  if (ogBatch.length > 0) {
     enrichPromises.push(
       Promise.allSettled(
-        ogFetchQueue.map(async ({ id, url }) => {
+        ogBatch.map(async ({ id, url }) => {
           const ogImage = await fetchOgImage(url)
-          if (ogImage) {
-            db.update(tabs)
-              .set({ ogImage, updatedAt: new Date().toISOString() })
-              .where(eq(tabs.id, id))
-              .run()
-          }
+          db.update(tabs)
+            .set({ ogImage: ogImage ?? "", updatedAt: new Date().toISOString() })
+            .where(eq(tabs.id, id))
+            .run()
         }),
       ),
     )
