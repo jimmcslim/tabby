@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { Tab } from "@/types"
+import { type GroupBy, type SortBy, type TabGroup, groupTabs, sortTabs } from "@/lib/tabs/grouping"
 import { useSyncContext } from "@/components/providers/sync-provider"
 import { Header } from "@/components/layout/header"
 import { TabGrid } from "@/components/tabs/tab-grid"
@@ -9,8 +10,9 @@ import { TabList } from "@/components/tabs/tab-list"
 import { TabDetailSheet } from "@/components/tabs/tab-detail-sheet"
 import { ReaderSheet } from "@/components/tabs/reader-sheet"
 import { BulkActionBar } from "@/components/tabs/bulk-action-bar"
+import { EditableGroupHeader } from "@/components/tabs/group-header"
+import { CardZoomControl } from "@/components/tabs/card-zoom-control"
 import { EmptyState } from "@/components/shared/empty-state"
-import { FaviconImage } from "@/components/shared/favicon-image"
 import { Button } from "@/components/ui/button"
 import {
   Select,
@@ -19,185 +21,24 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog"
+import { CloseDuplicatesDialog, type DuplicateInfo } from "@/components/dialogs/close-duplicates-dialog"
+import { SuspendStaleDialog } from "@/components/dialogs/suspend-stale-dialog"
+import { CloseGroupDialog } from "@/components/dialogs/close-group-dialog"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-import { Slider } from "@/components/ui/slider"
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   SparklesIcon,
-  PencilEdit01Icon,
   Copy01Icon,
   SleepingIcon,
   Cancel01Icon,
   GridViewIcon,
   ListViewIcon,
-  MinusSignIcon,
-  PlusSignIcon,
   ArrowDown01Icon,
   ArrowUpDoubleIcon,
   ArrowDownDoubleIcon,
 } from "@hugeicons/core-free-icons"
 import { toast } from "sonner"
-
-type GroupBy = "window" | "category" | "domain" | "none"
-type SortBy = "browser" | "lastAccessed" | "oldest" | "newest" | "title" | "domain"
-
-// Applied within each group. tabIndex/lastAccessedAt only exist for
-// extension-sourced tabs; both sorts fall back to first-seen order.
-function sortTabs(tabs: Tab[], sortBy: SortBy): Tab[] {
-  const byFirstSeen = (a: Tab, b: Tab) => a.firstSeenAt.localeCompare(b.firstSeenAt)
-  const cmp: (a: Tab, b: Tab) => number = {
-    browser: (a: Tab, b: Tab) =>
-      (a.windowId ?? Number.MAX_SAFE_INTEGER) - (b.windowId ?? Number.MAX_SAFE_INTEGER) ||
-      (a.tabIndex ?? Number.MAX_SAFE_INTEGER) - (b.tabIndex ?? Number.MAX_SAFE_INTEGER) ||
-      byFirstSeen(a, b),
-    lastAccessed: (a: Tab, b: Tab) =>
-      (b.lastAccessedAt ?? "").localeCompare(a.lastAccessedAt ?? "") || -byFirstSeen(a, b),
-    oldest: byFirstSeen,
-    newest: (a: Tab, b: Tab) => -byFirstSeen(a, b),
-    title: (a: Tab, b: Tab) =>
-      (a.title || a.url).localeCompare(b.title || b.url, undefined, { sensitivity: "base" }),
-    domain: (a: Tab, b: Tab) =>
-      (a.domain || "").localeCompare(b.domain || "") ||
-      (a.title || a.url).localeCompare(b.title || b.url, undefined, { sensitivity: "base" }),
-  }[sortBy]
-  return [...tabs].sort(cmp)
-}
-
-interface TabGroup {
-  key: string // raw key for identification (e.g. windowId "1382002407")
-  label: string // display label
-  editable: boolean
-  tabs: Tab[]
-}
-
-function groupTabs(
-  tabs: Tab[],
-  groupBy: GroupBy,
-  windowNames: Record<string, string>,
-): TabGroup[] {
-  if (groupBy === "none") return [{ key: "__all", label: "", editable: false, tabs }]
-
-  const map = new Map<string, Tab[]>()
-  const keyOrder: string[] = []
-  for (const tab of tabs) {
-    let key: string
-    switch (groupBy) {
-      case "window":
-        key = tab.windowId != null ? String(tab.windowId) : "__unknown"
-        break
-      case "category":
-        key = tab.category || "__uncategorized"
-        break
-      case "domain":
-        key = tab.domain || "__unknown"
-        break
-    }
-    const list = map.get(key)
-    if (list) {
-      list.push(tab)
-    } else {
-      map.set(key, [tab])
-      keyOrder.push(key)
-    }
-  }
-
-  // For window grouping, assign friendly names
-  if (groupBy === "window") {
-    let autoIndex = 1
-    return keyOrder.map((key) => {
-      const tabs = map.get(key)!
-      if (key === "__unknown") {
-        return { key, label: "Unknown Window", editable: false, tabs }
-      }
-      const customName = windowNames[key]
-      const label = customName || `Window ${autoIndex}`
-      autoIndex++
-      return { key, label, editable: true, tabs }
-    })
-  }
-
-  return keyOrder
-    .sort((a, b) => {
-      if (a.startsWith("__")) return 1
-      if (b.startsWith("__")) return -1
-      return a.localeCompare(b, undefined, { numeric: true })
-    })
-    .map((key) => {
-      const tabs = map.get(key)!
-      const label = key === "__uncategorized" ? "Uncategorized" : key === "__unknown" ? "Unknown" : key
-      return { key, label, editable: false, tabs }
-    })
-}
-
-function EditableGroupHeader({
-  group,
-  onRename,
-}: {
-  group: TabGroup
-  onRename: (windowId: string, name: string) => void
-}) {
-  const [editing, setEditing] = useState(false)
-  const [value, setValue] = useState(group.label)
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    setValue(group.label)
-  }, [group.label])
-
-  useEffect(() => {
-    if (editing) inputRef.current?.select()
-  }, [editing])
-
-  const commit = () => {
-    setEditing(false)
-    const trimmed = value.trim()
-    if (trimmed && trimmed !== group.label) {
-      onRename(group.key, trimmed)
-    } else {
-      setValue(group.label)
-    }
-  }
-
-  if (editing) {
-    return (
-      <input
-        ref={inputRef}
-        className="bg-transparent text-sm font-medium text-muted-foreground outline-none border-b border-muted-foreground/30 focus:border-foreground"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") commit()
-          if (e.key === "Escape") {
-            setValue(group.label)
-            setEditing(false)
-          }
-        }}
-      />
-    )
-  }
-
-  return (
-    <button
-      className="group/rename flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-      onClick={() => setEditing(true)}
-    >
-      {group.label}
-      <HugeiconsIcon
-        icon={PencilEdit01Icon}
-        className="size-3 opacity-0 group-hover/rename:opacity-60 transition-opacity"
-      />
-    </button>
-  )
-}
 
 export default function DashboardPage() {
   const { lastSync, chromeStatus } = useSyncContext()
@@ -217,7 +58,7 @@ export default function DashboardPage() {
   const [classifyingAll, setClassifyingAll] = useState(false)
   const [bulkClassifying, setBulkClassifying] = useState(false)
   const [dupeDialogOpen, setDupeDialogOpen] = useState(false)
-  const [dupeInfo, setDupeInfo] = useState<{ duplicates: { url: string; count: number }[]; totalToClose: number } | null>(null)
+  const [dupeInfo, setDupeInfo] = useState<DuplicateInfo | null>(null)
   const [closingDupes, setClosingDupes] = useState(false)
   const [staleDialogOpen, setStaleDialogOpen] = useState(false)
   const [staleTabs, setStaleTabs] = useState<Tab[]>([])
@@ -740,43 +581,11 @@ export default function DashboardPage() {
         onOpenChange={(open) => !open && setReaderTab(null)}
       />
 
-      {view === "card" && !loading && tabs.length > 0 && (
-        <div className="fixed bottom-6 right-8 z-40 flex items-center gap-2.5 rounded-full border bg-background/80 py-2 pl-3.5 pr-4 shadow-lg backdrop-blur-md">
-          <button
-            className="shrink-0 rounded-full p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
-            onClick={() => setGridCols((c) => Math.min(c + 1, 12))}
-            disabled={gridCols >= 12}
-            title="Zoom out"
-            aria-label="Zoom out"
-          >
-            <HugeiconsIcon icon={MinusSignIcon} className="size-3.5" />
-          </button>
-          <div className="w-64">
-            <Slider
-              aria-label="Card zoom"
-              min={8}
-              max={16}
-              step={1}
-              // Inverted: slider right = zoom in (fewer, larger cards).
-              // cols = 20 - value, so 16 -> 4 cols (default), 8 -> 12 cols.
-              value={[20 - gridCols]}
-              onValueChange={(value) => {
-                const v = Array.isArray(value) ? value[0] : value
-                setGridCols(20 - v)
-              }}
-            />
-          </div>
-          <button
-            className="shrink-0 rounded-full p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
-            onClick={() => setGridCols((c) => Math.max(c - 1, 4))}
-            disabled={gridCols <= 4}
-            title="Zoom in"
-            aria-label="Zoom in"
-          >
-            <HugeiconsIcon icon={PlusSignIcon} className="size-3.5" />
-          </button>
-        </div>
-      )}
+      <CardZoomControl
+        visible={view === "card" && !loading && tabs.length > 0}
+        value={gridCols}
+        onChange={setGridCols}
+      />
 
       <BulkActionBar
         count={selectedIds.size}
@@ -786,93 +595,29 @@ export default function DashboardPage() {
         classifying={bulkClassifying}
       />
 
-      <Dialog open={dupeDialogOpen} onOpenChange={setDupeDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Close Duplicate Tabs</DialogTitle>
-          </DialogHeader>
-          {dupeInfo && dupeInfo.totalToClose === 0 ? (
-            <p className="py-4 text-sm text-muted-foreground">No duplicate tabs found.</p>
-          ) : dupeInfo ? (
-            <div className="py-4 space-y-3">
-              <p className="text-sm text-muted-foreground">
-                Found <span className="font-medium text-foreground">{dupeInfo.totalToClose}</span> duplicate{" "}
-                tab{dupeInfo.totalToClose !== 1 ? "s" : ""} across{" "}
-                <span className="font-medium text-foreground">{dupeInfo.duplicates.length}</span> URL{dupeInfo.duplicates.length !== 1 ? "s" : ""}.
-              </p>
-              <div className="max-h-48 space-y-1 overflow-y-auto">
-                {dupeInfo.duplicates.map((d) => (
-                  <div key={d.url} className="flex items-center justify-between rounded-lg bg-muted px-3 py-2 text-xs">
-                    <span className="min-w-0 truncate text-muted-foreground">{d.url}</span>
-                    <span className="ml-2 shrink-0 font-medium">{d.count}x</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDupeDialogOpen(false)}>Cancel</Button>
-            {dupeInfo && dupeInfo.totalToClose > 0 && (
-              <Button variant="destructive" onClick={handleCloseDuplicates} disabled={closingDupes}>
-                {closingDupes ? "Closing..." : `Close ${dupeInfo.totalToClose} duplicate${dupeInfo.totalToClose !== 1 ? "s" : ""}`}
-              </Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <CloseDuplicatesDialog
+        open={dupeDialogOpen}
+        onOpenChange={setDupeDialogOpen}
+        dupeInfo={dupeInfo}
+        closing={closingDupes}
+        onConfirm={handleCloseDuplicates}
+      />
 
-      <Dialog open={staleDialogOpen} onOpenChange={setStaleDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Suspend Stale Tabs</DialogTitle>
-          </DialogHeader>
-          {staleTabs.length === 0 ? (
-            <p className="py-4 text-sm text-muted-foreground">No stale tabs found. All tabs have been active in the last 24 hours.</p>
-          ) : (
-            <div className="py-4 space-y-3">
-              <p className="text-sm text-muted-foreground">
-                Found <span className="font-medium text-foreground">{staleTabs.length}</span> tab{staleTabs.length !== 1 ? "s" : ""} inactive for over 24 hours.
-              </p>
-              <div className="max-h-48 space-y-1 overflow-y-auto">
-                {staleTabs.map((t) => (
-                  <div key={t.id} className="flex items-center gap-2 rounded-lg bg-muted px-3 py-2 text-xs">
-                    <FaviconImage url={t.faviconUrl} domain={t.domain} size={14} />
-                    <span className="min-w-0 truncate">{t.title || t.url}</span>
-                    <span className="ml-auto shrink-0 text-muted-foreground">{t.domain}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setStaleDialogOpen(false)}>Cancel</Button>
-            {staleTabs.length > 0 && (
-              <Button variant="destructive" onClick={handleCloseStale} disabled={closingStale}>
-                {closingStale ? "Suspending..." : `Suspend ${staleTabs.length} tab${staleTabs.length !== 1 ? "s" : ""}`}
-              </Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <SuspendStaleDialog
+        open={staleDialogOpen}
+        onOpenChange={setStaleDialogOpen}
+        staleTabs={staleTabs}
+        closing={closingStale}
+        onConfirm={handleCloseStale}
+      />
 
-      <Dialog open={!!closeGroupConfirm} onOpenChange={(o) => !o && setCloseGroupConfirm(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Close All Tabs</DialogTitle>
-          </DialogHeader>
-          {closeGroupConfirm && (
-            <p className="py-4 text-sm text-muted-foreground">
-              Close all <span className="font-medium text-foreground">{closeGroupConfirm.tabs.length}</span> tab{closeGroupConfirm.tabs.length !== 1 ? "s" : ""} in &ldquo;{closeGroupConfirm.label}&rdquo;?
-            </p>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCloseGroupConfirm(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={handleConfirmCloseGroup}>
-              Close {closeGroupConfirm?.tabs.length} tab{(closeGroupConfirm?.tabs.length ?? 0) !== 1 ? "s" : ""}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <CloseGroupDialog
+        open={!!closeGroupConfirm}
+        groupLabel={closeGroupConfirm?.label ?? ""}
+        tabCount={closeGroupConfirm?.tabs.length ?? 0}
+        onOpenChange={(o) => !o && setCloseGroupConfirm(null)}
+        onConfirm={handleConfirmCloseGroup}
+      />
     </>
   )
 }
