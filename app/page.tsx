@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/dialog"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Slider } from "@/components/ui/slider"
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   SparklesIcon,
@@ -39,6 +40,9 @@ import {
   ListViewIcon,
   MinusSignIcon,
   PlusSignIcon,
+  ArrowDown01Icon,
+  ArrowUpDoubleIcon,
+  ArrowDownDoubleIcon,
 } from "@hugeicons/core-free-icons"
 import { toast } from "sonner"
 
@@ -206,6 +210,8 @@ export default function DashboardPage() {
   const [view, setView] = useState<"card" | "list">("card")
   // Cards per row in card view: 4 (max zoom in, default) to 16 (max zoom out)
   const [gridCols, setGridCols] = useState(4)
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
+  const groupRefs = useRef(new Map<string, HTMLDivElement>())
   const [windowNames, setWindowNames] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [classifyingAll, setClassifyingAll] = useState(false)
@@ -251,6 +257,25 @@ export default function DashboardPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ windowId, name }),
     })
+  }, [])
+
+  // Group keys aren't stable across grouping modes (e.g. a window id could
+  // collide with a domain string), so collapsed state doesn't carry over.
+  useEffect(() => {
+    setCollapsedGroups(new Set())
+  }, [groupBy])
+
+  const toggleGroupCollapsed = useCallback((key: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }, [])
+
+  const scrollGroupIntoView = useCallback((key: string, edge: "start" | "end") => {
+    groupRefs.current.get(key)?.scrollIntoView({ behavior: "smooth", block: edge })
   }, [])
 
   const handleSelect = useCallback((id: string, selected: boolean) => {
@@ -594,9 +619,32 @@ export default function DashboardPage() {
         ) : (
           <div className="space-y-8 pt-8">
             {groups.map((group) => (
-              <div key={group.key} className="group/section">
+              <Collapsible
+                key={group.key}
+                open={!collapsedGroups.has(group.key)}
+                onOpenChange={() => toggleGroupCollapsed(group.key)}
+                render={
+                  <div
+                    className="group/section"
+                    ref={(el) => {
+                      if (el) groupRefs.current.set(group.key, el)
+                      else groupRefs.current.delete(group.key)
+                    }}
+                  />
+                }
+              >
                 {group.label && (
                   <div className="sticky top-0 z-10 -mx-2 mb-2 flex items-center gap-3 rounded-b-lg bg-background/80 px-2 py-2 backdrop-blur-md">
+                    <CollapsibleTrigger
+                      className="shrink-0 rounded-lg p-1 text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground"
+                      title={collapsedGroups.has(group.key) ? "Expand group" : "Collapse group"}
+                      aria-label={collapsedGroups.has(group.key) ? `Expand ${group.label}` : `Collapse ${group.label}`}
+                    >
+                      <HugeiconsIcon
+                        icon={ArrowDown01Icon}
+                        className={`size-3.5 transition-transform ${collapsedGroups.has(group.key) ? "-rotate-90" : ""}`}
+                      />
+                    </CollapsibleTrigger>
                     {group.editable ? (
                       <EditableGroupHeader group={group} onRename={handleRenameWindow} />
                     ) : (
@@ -608,46 +656,66 @@ export default function DashboardPage() {
                       {group.tabs.length} {group.tabs.length === 1 ? "tab" : "tabs"}
                     </span>
                     <div className="h-px flex-1 bg-border/50" />
-                    <button
-                      className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-muted-foreground/60 opacity-0 transition-all hover:bg-destructive/10 hover:text-destructive group-hover/section:opacity-100"
-                      onClick={() => setCloseGroupConfirm(group)}
-                      title={`Close all tabs in ${group.label}`}
-                    >
-                      <HugeiconsIcon icon={Cancel01Icon} className="size-3" />
-                      Close all
-                    </button>
+                    <div className="flex items-center gap-1 opacity-0 transition-all group-hover/section:opacity-100">
+                      <button
+                        className="rounded-lg p-1.5 text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground"
+                        onClick={() => scrollGroupIntoView(group.key, "start")}
+                        title={`Scroll to start of ${group.label}`}
+                        aria-label={`Scroll to start of ${group.label}`}
+                      >
+                        <HugeiconsIcon icon={ArrowUpDoubleIcon} className="size-3.5" />
+                      </button>
+                      <button
+                        className="rounded-lg p-1.5 text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground"
+                        onClick={() => scrollGroupIntoView(group.key, "end")}
+                        title={`Scroll to end of ${group.label}`}
+                        aria-label={`Scroll to end of ${group.label}`}
+                      >
+                        <HugeiconsIcon icon={ArrowDownDoubleIcon} className="size-3.5" />
+                      </button>
+                      <button
+                        className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-muted-foreground/60 transition-colors hover:bg-destructive/10 hover:text-destructive"
+                        onClick={() => setCloseGroupConfirm(group)}
+                        title={`Close all tabs in ${group.label}`}
+                      >
+                        <HugeiconsIcon icon={Cancel01Icon} className="size-3" />
+                        Close all
+                      </button>
+                    </div>
                   </div>
                 )}
-                {view === "card" ? (
-                  <TabGrid
-                    tabs={group.tabs}
-                    columns={gridCols}
-                    onAddTab={
-                      groupBy === "window" && group.key !== "__unknown"
-                        ? () => handleAddTab(Number(group.key))
-                        : undefined
-                    }
-                    selectedIds={selectedIds}
-                    onSelect={handleSelect}
-                    onFocus={handleFocus}
-                    onClose={handleClose}
-                    onClassify={handleClassify}
-                    onTabClick={setDetailTab}
-                    onReadArticle={setReaderTab}
-                  />
-                ) : (
-                  <TabList
-                    tabs={group.tabs}
-                    selectedIds={selectedIds}
-                    onSelect={handleSelect}
-                    onFocus={handleFocus}
-                    onClose={handleClose}
-                    onClassify={handleClassify}
-                    onTabClick={setDetailTab}
-                    onReadArticle={setReaderTab}
-                  />
-                )}
-              </div>
+                <CollapsibleContent className="overflow-hidden data-open:animate-accordion-down data-closed:animate-accordion-up">
+                  {view === "card" ? (
+                    <TabGrid
+                      tabs={group.tabs}
+                      columns={gridCols}
+                      onAddTab={
+                        groupBy === "window" && group.key !== "__unknown"
+                          ? () => handleAddTab(Number(group.key))
+                          : undefined
+                      }
+                      selectedIds={selectedIds}
+                      onSelect={handleSelect}
+                      onFocus={handleFocus}
+                      onClose={handleClose}
+                      onClassify={handleClassify}
+                      onTabClick={setDetailTab}
+                      onReadArticle={setReaderTab}
+                    />
+                  ) : (
+                    <TabList
+                      tabs={group.tabs}
+                      selectedIds={selectedIds}
+                      onSelect={handleSelect}
+                      onFocus={handleFocus}
+                      onClose={handleClose}
+                      onClassify={handleClassify}
+                      onTabClick={setDetailTab}
+                      onReadArticle={setReaderTab}
+                    />
+                  )}
+                </CollapsibleContent>
+              </Collapsible>
             ))}
           </div>
         )}
