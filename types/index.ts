@@ -84,6 +84,8 @@ export interface ChromeStatus {
 export interface ExtensionSnapshot {
   extensionVersion: string
   tabs: ChromeTab[]
+  /** True on the first sync after chrome.runtime.onStartup fires (browser relaunch) */
+  isStartup?: boolean
 }
 
 /** Command the server pushes to the extension (SSE or sync-response backlog) */
@@ -121,6 +123,7 @@ export interface Session {
   id: string
   name: string
   isAuto: boolean
+  isPrevious: boolean
   tabCount: number
   createdAt: string
   updatedAt: string

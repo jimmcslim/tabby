@@ -54,6 +54,7 @@ export const sessions = sqliteTable("sessions", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   isAuto: integer("is_auto", { mode: "boolean" }).notNull().default(false),
+  isPrevious: integer("is_previous", { mode: "boolean" }).notNull().default(false),
   tabCount: integer("tab_count").notNull().default(0),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),

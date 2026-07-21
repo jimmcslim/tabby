@@ -2,7 +2,7 @@ import { getDb } from "@/lib/db"
 import { tabs } from "@/lib/db/schema"
 import { eq } from "drizzle-orm"
 import { nanoid } from "nanoid"
-import { updateAutoSession } from "@/lib/sessions/auto-save"
+import { syncAutoSessions } from "@/lib/sessions/auto-save"
 import { fetchOgImage, isTweetUrl, fetchTweetData } from "@/lib/og"
 import { getBridge, isExtensionSseConnected, dispatchCommand } from "@/lib/extension/bridge"
 import type { ChromeTab, SyncResult, TabSuspendedState } from "@/types"
@@ -50,7 +50,10 @@ export async function syncTabs(): Promise<SyncResult> {
   return getBridge().lastSyncResult ?? EMPTY_RESULT
 }
 
-export async function syncTabsFromList(chromeTabs: ChromeTab[]): Promise<SyncResult> {
+export async function syncTabsFromList(
+  chromeTabs: ChromeTab[],
+  options: { isStartup?: boolean } = {},
+): Promise<SyncResult> {
   const now = new Date().toISOString()
   const db = await getDb()
 
@@ -163,7 +166,7 @@ export async function syncTabsFromList(chromeTabs: ChromeTab[]): Promise<SyncRes
     }
   }
 
-  await updateAutoSession()
+  await syncAutoSessions(!!options.isStartup)
 
   // Fetch OG images and tweet data in the background (non-blocking).
   // OG fetches are capped per sync so a large backlog (e.g. first sync of

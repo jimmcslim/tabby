@@ -39,6 +39,7 @@ export async function POST(request: NextRequest) {
     id: nanoid(),
     name: body.session.name.trim(),
     isAuto: false,
+    isPrevious: false,
     tabCount: body.session.tabs.length,
     createdAt: body.session.createdAt || now,
     updatedAt: now,

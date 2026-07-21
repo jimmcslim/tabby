@@ -21,6 +21,22 @@ async function getBaseUrl() {
   return baseUrl.replace(/\/+$/, "")
 }
 
+// --- Startup (browser relaunch) tracking -------------------------------------
+// Set right before the first sync after chrome.runtime.onStartup fires, so the
+// server can snapshot the pre-restart "Latest" session into "Previous Session"
+// before overwriting it. Stored (not a module var) so it survives the service
+// worker being killed and woken again by the watchdog alarm before a retry
+// succeeds — e.g. the browser launches offline.
+
+async function setPendingStartupSnapshot(value) {
+  await chrome.storage.local.set({ pendingStartupSnapshot: value })
+}
+
+async function getPendingStartupSnapshot() {
+  const { pendingStartupSnapshot } = await chrome.storage.local.get({ pendingStartupSnapshot: false })
+  return pendingStartupSnapshot
+}
+
 // --- Snapshot push -----------------------------------------------------------
 
 // Tabby's own UI (the pinned tab, or any tab on the server origin) should not
@@ -65,13 +81,15 @@ async function pushSnapshot() {
     const tabs = allTabs
       .filter((t) => t.id !== chrome.tabs.TAB_ID_NONE && t.url && !isTabbyTab(t, baseUrl))
       .map(tabToChromeTab)
+    const isStartup = await getPendingStartupSnapshot()
 
     const res = await fetch(baseUrl + "/api/extension/sync", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ extensionVersion: VERSION, tabs }),
+      body: JSON.stringify({ extensionVersion: VERSION, tabs, isStartup }),
     })
     if (!res.ok) throw new Error("sync failed: " + res.status)
+    if (isStartup) await setPendingStartupSnapshot(false)
     const body = await res.json()
 
     // Commands queued while SSE was down piggyback on the sync response
@@ -319,7 +337,8 @@ chrome.runtime.onInstalled.addListener(() => {
   ensurePinnedTabs()
   pushSnapshot()
 })
-chrome.runtime.onStartup.addListener(() => {
+chrome.runtime.onStartup.addListener(async () => {
+  await setPendingStartupSnapshot(true)
   ensurePinnedTabs()
   pushSnapshot()
 })

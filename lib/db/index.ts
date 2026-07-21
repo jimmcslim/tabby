@@ -67,6 +67,7 @@ async function initDb(): Promise<DB> {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       is_auto INTEGER NOT NULL DEFAULT 0,
+      is_previous INTEGER NOT NULL DEFAULT 0,
       tab_count INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
@@ -117,6 +118,12 @@ async function initDb(): Promise<DB> {
 
   try {
     sqlite.exec(`ALTER TABLE tabs ADD COLUMN suspended_state TEXT`)
+  } catch {
+    // column already exists
+  }
+
+  try {
+    sqlite.exec(`ALTER TABLE sessions ADD COLUMN is_previous INTEGER NOT NULL DEFAULT 0`)
   } catch {
     // column already exists
   }

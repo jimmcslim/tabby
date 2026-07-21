@@ -14,6 +14,8 @@ interface Bridge {
   lastReportAt: number | null
   lastSyncResult: SyncResult | null
   extensionVersion?: string
+  /** Epoch ms until which the heavy sync pipeline is suppressed (bulk restore) */
+  restoreLockUntil: number | null
 }
 
 // Survives route-handler module duplication in dev, same pattern as getDb
@@ -28,6 +30,7 @@ export function getBridge(): Bridge {
       pending: new Map(),
       lastReportAt: null,
       lastSyncResult: null,
+      restoreLockUntil: null,
     } satisfies Bridge
   }
   return g[BRIDGE_KEY] as Bridge
@@ -35,6 +38,25 @@ export function getBridge(): Bridge {
 
 export function isExtensionSseConnected(): boolean {
   return getBridge().subscribers.size > 0
+}
+
+// Max window a single restore may hold the lock before it auto-expires, so a
+// crashed/abandoned restore can never wedge the sync pipeline permanently. The
+// restore loop refreshes it each batch, so this only matters if that loop dies.
+const RESTORE_LOCK_MAX_MS = 5 * 60_000
+
+/** Suppress (or refresh suppression of) the heavy sync pipeline during a bulk restore. */
+export function acquireRestoreLock(): void {
+  getBridge().restoreLockUntil = Date.now() + RESTORE_LOCK_MAX_MS
+}
+
+export function releaseRestoreLock(): void {
+  getBridge().restoreLockUntil = null
+}
+
+export function isRestoreLocked(): boolean {
+  const { restoreLockUntil } = getBridge()
+  return restoreLockUntil !== null && Date.now() < restoreLockUntil
 }
 
 /** True when the extension pushed a snapshot recently (covers SSE reconnect gaps) */

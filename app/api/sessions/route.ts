@@ -37,6 +37,7 @@ export async function POST(request: NextRequest) {
     id: nanoid(),
     name: name.trim(),
     isAuto: false,
+    isPrevious: false,
     tabCount: uniqueTabs.length,
     createdAt: now,
     updatedAt: now,

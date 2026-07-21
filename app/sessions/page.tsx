@@ -74,7 +74,8 @@ export default function SessionsPage() {
     fetchSessions()
   }, [deleteTarget, fetchSessions])
 
-  const autoSession = sessions.find((s) => s.isAuto)
+  const latestSession = sessions.find((s) => s.isAuto && !s.isPrevious)
+  const previousSession = sessions.find((s) => s.isAuto && s.isPrevious)
   const manualSessions = sessions.filter((s) => !s.isAuto)
 
   return (
@@ -102,14 +103,31 @@ export default function SessionsPage() {
         ) : (
           <div className="space-y-8">
             {/* Auto-saved latest session */}
-            {autoSession && (
+            {latestSession && (
               <section>
                 <h2 className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
                   Current Session
                 </h2>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   <SessionCard
-                    session={autoSession}
+                    session={latestSession}
+                    onRestore={handleRestore}
+                    onExport={handleExport}
+                    onClick={(s) => setDetailId(s.id)}
+                  />
+                </div>
+              </section>
+            )}
+
+            {/* Snapshot of tabs from right before the last browser restart */}
+            {previousSession && (
+              <section>
+                <h2 className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Previous Session
+                </h2>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <SessionCard
+                    session={previousSession}
                     onRestore={handleRestore}
                     onExport={handleExport}
                     onClick={(s) => setDetailId(s.id)}

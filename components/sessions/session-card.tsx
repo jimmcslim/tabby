@@ -65,7 +65,7 @@ export function SessionCard({ session, onRestore, onExport, onRename, onDelete, 
           <h3 className="text-sm font-semibold">{session.name}</h3>
           {session.isAuto && (
             <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-              Auto-saved
+              {session.isPrevious ? "Previous session" : "Auto-saved"}
             </span>
           )}
         </div>
