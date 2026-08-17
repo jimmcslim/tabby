@@ -17,9 +17,17 @@ const DB_PATH = process.env.DATABASE_PATH || path.join(process.cwd(), "data", "t
 
 let _db: DB | null = null
 
+/**
+ * Where drizzle-kit writes migrations (see drizzle.config.ts). Read from disk
+ * at startup, so the folder has to ship with the app — the Dockerfile copies it
+ * into the standalone image.
+ */
+const MIGRATIONS_DIR = path.join(process.cwd(), "lib", "db", "migrations")
+
 async function initDb(): Promise<DB> {
   const { Database } = await import("bun:sqlite")
   const { drizzle } = await import("drizzle-orm/bun-sqlite")
+  const { migrate } = await import("drizzle-orm/bun-sqlite/migrator")
   const s = await import("./schema")
 
   fs.mkdirSync(path.dirname(DB_PATH), { recursive: true })
@@ -31,116 +39,21 @@ async function initDb(): Promise<DB> {
   // would otherwise fail outright rather than briefly queue.
   sqlite.exec("PRAGMA busy_timeout = 5000")
 
-  sqlite.exec(`
-    CREATE TABLE IF NOT EXISTS tabs (
-      id TEXT PRIMARY KEY,
-      chrome_id TEXT,
-      url TEXT NOT NULL,
-      title TEXT,
-      domain TEXT,
-      favicon_url TEXT,
-      status TEXT NOT NULL DEFAULT 'open',
-      type TEXT NOT NULL DEFAULT 'page',
-      category TEXT,
-      summary TEXT,
-      og_image TEXT,
-      description TEXT,
-      is_pinned INTEGER NOT NULL DEFAULT 0,
-      first_seen_at TEXT NOT NULL,
-      last_seen_at TEXT NOT NULL,
-      closed_at TEXT,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    );
+  const db = drizzle(sqlite, { schema: s })
 
-    CREATE TABLE IF NOT EXISTS groups (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      description TEXT,
-      color TEXT,
-      icon TEXT,
-      is_smart INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    );
+  // Schema lives in lib/db/migrations, applied on every boot.
+  //
+  // Databases created by the pre-migration bootstrap (CREATE TABLE IF NOT
+  // EXISTS + try/catch ALTERs at startup) have the full schema but no
+  // __drizzle_migrations table, so drizzle would try to apply 0000 to them.
+  // Rather than baseline-marking those rows behind drizzle's back, the 0000
+  // migration is written as IF NOT EXISTS throughout: applying it to such a
+  // database is a no-op that just records the migration, and applying it to an
+  // empty file creates the schema. Migrations after 0000 are plain generated
+  // SQL — the special case is the baseline only.
+  migrate(db, { migrationsFolder: MIGRATIONS_DIR })
 
-    CREATE TABLE IF NOT EXISTS tabs_to_groups (
-      tab_id TEXT NOT NULL REFERENCES tabs(id) ON DELETE CASCADE,
-      group_id TEXT NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
-      PRIMARY KEY (tab_id, group_id)
-    );
-
-    CREATE TABLE IF NOT EXISTS settings (
-      key TEXT PRIMARY KEY,
-      value TEXT
-    );
-
-    CREATE TABLE IF NOT EXISTS sessions (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      is_auto INTEGER NOT NULL DEFAULT 0,
-      is_previous INTEGER NOT NULL DEFAULT 0,
-      tab_count INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS session_tabs (
-      id TEXT PRIMARY KEY,
-      session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
-      url TEXT NOT NULL,
-      title TEXT,
-      domain TEXT,
-      favicon_url TEXT,
-      category TEXT,
-      position INTEGER NOT NULL DEFAULT 0
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_tabs_status ON tabs(status);
-    CREATE INDEX IF NOT EXISTS idx_tabs_chrome_id ON tabs(chrome_id);
-    CREATE INDEX IF NOT EXISTS idx_tabs_domain ON tabs(domain);
-    CREATE INDEX IF NOT EXISTS idx_tabs_category ON tabs(category);
-    CREATE INDEX IF NOT EXISTS idx_session_tabs_session_id ON session_tabs(session_id);
-  `)
-
-  // Migrations for existing databases
-  try {
-    sqlite.exec(`ALTER TABLE tabs ADD COLUMN window_id INTEGER`)
-  } catch {
-    // column already exists
-  }
-
-  try {
-    sqlite.exec(`ALTER TABLE tabs ADD COLUMN is_article INTEGER`)
-  } catch {
-    // column already exists
-  }
-
-  try {
-    sqlite.exec(`ALTER TABLE tabs ADD COLUMN tab_index INTEGER`)
-  } catch {
-    // column already exists
-  }
-
-  try {
-    sqlite.exec(`ALTER TABLE tabs ADD COLUMN last_accessed_at TEXT`)
-  } catch {
-    // column already exists
-  }
-
-  try {
-    sqlite.exec(`ALTER TABLE tabs ADD COLUMN suspended_state TEXT`)
-  } catch {
-    // column already exists
-  }
-
-  try {
-    sqlite.exec(`ALTER TABLE sessions ADD COLUMN is_previous INTEGER NOT NULL DEFAULT 0`)
-  } catch {
-    // column already exists
-  }
-
-  return drizzle(sqlite, { schema: s })
+  return db
 }
 
 let _initPromise: Promise<DB> | null = null
