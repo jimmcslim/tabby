@@ -1,6 +1,7 @@
 import { getDb } from "@/lib/db"
 import { tabs } from "@/lib/db/schema"
 import { chat, generate, isAvailable } from "@/lib/ollama"
+import { isEnrichmentDisabled } from "@/lib/enrichment"
 import { eq, and, isNull } from "drizzle-orm"
 
 const MODEL = process.env.OLLAMA_MODEL || "qwen3.5:latest"
@@ -111,6 +112,9 @@ async function summarizeTabs(
  * Runs in the background after each sync - non-blocking and idempotent.
  */
 export async function autoProcessTabs(): Promise<void> {
+  // Offline/deterministic mode — no Ollama probe, no page fetches.
+  if (isEnrichmentDisabled()) return
+
   // Prevent concurrent runs
   if (isProcessing) return
   isProcessing = true
