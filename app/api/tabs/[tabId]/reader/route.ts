@@ -91,7 +91,7 @@ export async function GET(
   const { tabId } = await params
   const db = await getDb()
 
-  const tab = db.select().from(tabs).where(eq(tabs.id, tabId)).get()
+  const [tab] = await db.select().from(tabs).where(eq(tabs.id, tabId)).limit(1)
   if (!tab) {
     return NextResponse.json({ error: "Tab not found" }, { status: 404 })
   }

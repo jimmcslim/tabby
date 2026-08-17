@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     }
 
     const db = await getDb()
-    const tab = db.select().from(tabs).where(eq(tabs.chromeId, tabId)).get()
+    const [tab] = await db.select().from(tabs).where(eq(tabs.chromeId, tabId)).limit(1)
     if (!tab || tab.status !== "open") {
       // Tab not synced yet (or already closed) — nothing to attach the capture to
       return NextResponse.json({ stored: false })

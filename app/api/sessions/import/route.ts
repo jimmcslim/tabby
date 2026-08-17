@@ -45,22 +45,20 @@ export async function POST(request: NextRequest) {
     updatedAt: now,
   }
 
-  db.insert(sessions).values(session).run()
+  await db.insert(sessions).values(session)
 
-  db.insert(sessionTabs)
-    .values(
-      body.session.tabs.map((t: any, i: number) => ({
-        id: nanoid(),
-        sessionId: session.id,
-        url: t.url,
-        title: t.title || null,
-        domain: t.domain || null,
-        faviconUrl: t.faviconUrl || null,
-        category: t.category || null,
-        position: t.position ?? i,
-      })),
-    )
-    .run()
+  await db.insert(sessionTabs).values(
+    body.session.tabs.map((t: any, i: number) => ({
+      id: nanoid(),
+      sessionId: session.id,
+      url: t.url,
+      title: t.title || null,
+      domain: t.domain || null,
+      faviconUrl: t.faviconUrl || null,
+      category: t.category || null,
+      position: t.position ?? i,
+    })),
+  )
 
   return NextResponse.json(session, { status: 201 })
 }

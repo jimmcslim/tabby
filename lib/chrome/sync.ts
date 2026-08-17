@@ -67,6 +67,12 @@ export async function syncTabsFromList(
   // run in one transaction, so a failure partway through can never leave the
   // mirrors out of sync with what `tabs` actually says is open — either the
   // whole sync commits together or none of it does.
+  //
+  // This callback (and syncAutoSessions, which it calls) must stay
+  // synchronous: bun:sqlite's transaction() has signature (tx) => T, and
+  // silently discards the returned Promise if the callback is async —
+  // COMMIT fires before any awaited work inside actually finishes. Do not
+  // "finish the job" by adding await here without first switching drivers.
   db.transaction((tx) => {
     const dbTabs = tx.select().from(tabs).where(eq(tabs.status, "open")).all()
 
@@ -191,10 +197,10 @@ export async function syncTabsFromList(
       Promise.allSettled(
         ogBatch.map(async ({ id, url }) => {
           const ogImage = await fetchOgImage(url)
-          db.update(tabs)
+          await db
+            .update(tabs)
             .set({ ogImage: ogImage ?? "", updatedAt: new Date().toISOString() })
             .where(eq(tabs.id, id))
-            .run()
         }),
       ),
     )
@@ -206,14 +212,14 @@ export async function syncTabsFromList(
         tweetFetchQueue.map(async ({ id, url }) => {
           const tweet = await fetchTweetData(url)
           if (tweet) {
-            db.update(tabs)
+            await db
+              .update(tabs)
               .set({
                 description: JSON.stringify(tweet),
                 ogImage: tweet.imageUrl,
                 updatedAt: new Date().toISOString(),
               })
               .where(eq(tabs.id, id))
-              .run()
           }
         }),
       ),

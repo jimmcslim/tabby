@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
   const db = await getDb()
   const { tabId } = await request.json()
 
-  const tab = db.select().from(tabs).where(eq(tabs.id, tabId)).get()
+  const [tab] = await db.select().from(tabs).where(eq(tabs.id, tabId)).limit(1)
   if (!tab) {
     return NextResponse.json({ error: "Tab not found" }, { status: 404 })
   }
@@ -45,10 +45,10 @@ export async function POST(request: NextRequest) {
     )
 
     const now = new Date().toISOString()
-    db.update(tabs)
+    await db
+      .update(tabs)
       .set({ summary: summary.trim(), updatedAt: now })
       .where(eq(tabs.id, tabId))
-      .run()
 
     return NextResponse.json({ id: tabId, summary: summary.trim() })
   } catch (error) {

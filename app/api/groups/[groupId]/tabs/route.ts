@@ -10,7 +10,7 @@ export async function GET(
   const db = await getDb()
   const { groupId } = await params
 
-  const result = db
+  const result = await db
     .select({
       id: tabs.id,
       chromeId: tabs.chromeId,
@@ -35,7 +35,6 @@ export async function GET(
     .from(tabsToGroups)
     .innerJoin(tabs, eq(tabsToGroups.tabId, tabs.id))
     .where(eq(tabsToGroups.groupId, groupId))
-    .all()
 
   return NextResponse.json(result)
 }
@@ -54,13 +53,13 @@ export async function POST(
 
   if (action === "remove") {
     for (const tabId of tabIds) {
-      db.delete(tabsToGroups)
+      await db
+        .delete(tabsToGroups)
         .where(and(eq(tabsToGroups.tabId, tabId), eq(tabsToGroups.groupId, groupId)))
-        .run()
     }
   } else {
     for (const tabId of tabIds) {
-      db.insert(tabsToGroups).values({ tabId, groupId }).onConflictDoNothing().run()
+      await db.insert(tabsToGroups).values({ tabId, groupId }).onConflictDoNothing()
     }
   }
 

@@ -12,12 +12,12 @@ export async function PATCH(
   const body = await request.json()
   const now = new Date().toISOString()
 
-  db.update(tabs)
+  await db
+    .update(tabs)
     .set({ ...body, updatedAt: now })
     .where(eq(tabs.id, tabId))
-    .run()
 
-  const updated = db.select().from(tabs).where(eq(tabs.id, tabId)).get()
+  const [updated] = await db.select().from(tabs).where(eq(tabs.id, tabId)).limit(1)
   return NextResponse.json(updated)
 }
 
@@ -27,6 +27,6 @@ export async function DELETE(
 ) {
   const db = await getDb()
   const { tabId } = await params
-  db.delete(tabs).where(eq(tabs.id, tabId)).run()
+  await db.delete(tabs).where(eq(tabs.id, tabId))
   return NextResponse.json({ success: true })
 }

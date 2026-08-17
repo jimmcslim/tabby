@@ -51,14 +51,14 @@ async function classifyTabs(
       for (const item of parsed) {
         const idx = (item.index || item.i) - 1
         if (idx >= 0 && idx < batch.length && item.category) {
-          db.update(tabs)
+          await db
+            .update(tabs)
             .set({
               category: item.category,
               isArticle: item.isArticle === true,
               updatedAt: now,
             })
             .where(eq(tabs.id, batch[idx].id))
-            .run()
         }
       }
     } catch (e) {
@@ -96,10 +96,10 @@ async function summarizeTabs(
       )
 
       const now = new Date().toISOString()
-      db.update(tabs)
+      await db
+        .update(tabs)
         .set({ summary: summary.trim(), updatedAt: now })
         .where(eq(tabs.id, tab.id))
-        .run()
     } catch (e) {
       console.error("[auto-ai] summarize failed for tab:", tab.id, e)
     }
@@ -123,18 +123,16 @@ export async function autoProcessTabs(): Promise<void> {
     const db = await getDb()
 
     // Find open tabs without a category
-    const uncategorized = db
+    const uncategorized = await db
       .select({ id: tabs.id, url: tabs.url, title: tabs.title })
       .from(tabs)
       .where(and(eq(tabs.status, "open"), isNull(tabs.category)))
-      .all()
 
     // Find open tabs without a summary
-    const unsummarized = db
+    const unsummarized = await db
       .select({ id: tabs.id, url: tabs.url, title: tabs.title })
       .from(tabs)
       .where(and(eq(tabs.status, "open"), isNull(tabs.summary)))
-      .all()
 
     // Classify first (fast, batched), then summarize (slower, one-by-one)
     if (uncategorized.length > 0) {

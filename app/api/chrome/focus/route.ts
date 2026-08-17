@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
   const db = await getDb()
   const { tabId } = await request.json()
 
-  const tab = db.select().from(tabs).where(eq(tabs.id, tabId)).get()
+  const [tab] = await db.select().from(tabs).where(eq(tabs.id, tabId)).limit(1)
   if (!tab || !tab.chromeId) {
     return NextResponse.json({ error: "Tab not found or not open in Chrome" }, { status: 404 })
   }

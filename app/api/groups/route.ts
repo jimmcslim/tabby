@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from "next/server"
 
 export async function GET() {
   const db = await getDb()
-  const result = db
+  const result = await db
     .select({
       id: groups.id,
       name: groups.name,
@@ -19,7 +19,6 @@ export async function GET() {
       tabCount: sql<number>`(SELECT COUNT(*) FROM tabs_to_groups WHERE group_id = ${groups.id})`,
     })
     .from(groups)
-    .all()
 
   return NextResponse.json(result)
 }
@@ -40,11 +39,11 @@ export async function POST(request: NextRequest) {
     updatedAt: now,
   }
 
-  db.insert(groups).values(newGroup).run()
+  await db.insert(groups).values(newGroup)
 
   if (body.tabIds && Array.isArray(body.tabIds)) {
     for (const tabId of body.tabIds) {
-      db.insert(tabsToGroups).values({ tabId, groupId: newGroup.id }).onConflictDoNothing().run()
+      await db.insert(tabsToGroups).values({ tabId, groupId: newGroup.id }).onConflictDoNothing()
     }
   }
 

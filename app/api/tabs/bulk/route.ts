@@ -16,16 +16,16 @@ export async function POST(request: NextRequest) {
 
   switch (action) {
     case "close": {
-      const tabsToClose = db.select().from(tabs).where(inArray(tabs.id, tabIds)).all()
+      const tabsToClose = await db.select().from(tabs).where(inArray(tabs.id, tabIds))
       let closed = 0
       for (const tab of tabsToClose) {
         if (tab.chromeId) {
           try {
             await closeTab(tab.chromeId)
-            db.update(tabs)
+            await db
+              .update(tabs)
               .set({ status: "closed", closedAt: now, chromeId: null, updatedAt: now })
               .where(eq(tabs.id, tab.id))
-              .run()
             closed++
           } catch { /* skip */ }
         }
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ closed })
     }
     case "delete": {
-      db.delete(tabs).where(inArray(tabs.id, tabIds)).run()
+      await db.delete(tabs).where(inArray(tabs.id, tabIds))
       return NextResponse.json({ deleted: tabIds.length })
     }
     default:
