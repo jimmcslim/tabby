@@ -234,6 +234,8 @@ Import validates: version 1, non-empty name, non-empty tabs, valid URLs (blocks 
 | `DATABASE_PATH` | `./data/tabby.db` | SQLite database location |
 | `OLLAMA_URL` | `http://localhost:11434` | Ollama API endpoint |
 | `OLLAMA_MODEL` | `qwen3.5:latest` | Model for AI features |
+| `TABBY_DISABLE_ENRICHMENT` | unset | Set to `1` to suppress the background work a sync kicks off — OG image fetches, tweet lookups, and the Ollama classify/summarize pass. Tab, session and group writes are unaffected. Used by the end-to-end tests so they run offline and deterministically. |
+| `NEXT_DIST_DIR` | `.next` | Next.js build directory. The test harness sets `.next-test` so a second dev server doesn't collide with your own. |
 
 ## Keyboard Shortcuts
 

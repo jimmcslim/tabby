@@ -5,6 +5,7 @@ import { syncAutoSessions } from "@/lib/sessions/auto-save"
 import { fetchOgImage, fetchTweetData } from "@/lib/og"
 import { getBridge, isExtensionSseConnected, dispatchCommand } from "@/lib/extension/bridge"
 import { reconcileTabs } from "@/lib/chrome/reconcile"
+import { isEnrichmentDisabled } from "@/lib/enrichment"
 import type { ChromeTab, SyncResult } from "@/types"
 
 function isSyncResult(data: unknown): data is SyncResult {
@@ -98,8 +99,13 @@ export async function syncTabsFromList(
   // hundreds of tabs) drains gradually; unfetched tabs still have ogImage
   // null and re-queue next sync. "" records checked-but-none so sites
   // without OG tags aren't refetched forever.
+  //
+  // Both fetches are suppressed entirely when enrichment is disabled — see
+  // lib/enrichment.ts.
   const OG_FETCH_LIMIT = 15
-  const ogBatch = ogFetchQueue.slice(0, OG_FETCH_LIMIT)
+  const enrich = !isEnrichmentDisabled()
+  const ogBatch = enrich ? ogFetchQueue.slice(0, OG_FETCH_LIMIT) : []
+  const tweetBatch = enrich ? tweetFetchQueue : []
   const enrichPromises: Promise<unknown>[] = []
 
   if (ogBatch.length > 0) {
@@ -116,10 +122,10 @@ export async function syncTabsFromList(
     )
   }
 
-  if (tweetFetchQueue.length > 0) {
+  if (tweetBatch.length > 0) {
     enrichPromises.push(
       Promise.allSettled(
-        tweetFetchQueue.map(async ({ id, url }) => {
+        tweetBatch.map(async ({ id, url }) => {
           const tweet = await fetchTweetData(url)
           if (tweet) {
             await db
