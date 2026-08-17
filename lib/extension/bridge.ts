@@ -39,6 +39,20 @@ export function getBridge(): Bridge {
   return g[BRIDGE_KEY] as Bridge
 }
 
+/**
+ * Test-only: drop the cached bridge so each case starts from a clean state.
+ * Any in-flight command timers are cleared first, so a discarded bridge can't
+ * fire a rejection into a later test.
+ */
+export function __resetBridge(): void {
+  const g = globalThis as Record<string, unknown>
+  const existing = g[BRIDGE_KEY] as Bridge | undefined
+  if (existing) {
+    for (const { timer } of existing.pending.values()) clearTimeout(timer)
+  }
+  delete g[BRIDGE_KEY]
+}
+
 export function isExtensionSseConnected(): boolean {
   return getBridge().subscribers.size > 0
 }
