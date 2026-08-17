@@ -1,25 +1,11 @@
 import { getDb } from "@/lib/db"
 import { tabs } from "@/lib/db/schema"
 import { eq } from "drizzle-orm"
-import { nanoid } from "nanoid"
 import { syncAutoSessions } from "@/lib/sessions/auto-save"
-import { fetchOgImage, isTweetUrl, fetchTweetData } from "@/lib/og"
+import { fetchOgImage, fetchTweetData } from "@/lib/og"
 import { getBridge, isExtensionSseConnected, dispatchCommand } from "@/lib/extension/bridge"
-import type { ChromeTab, SyncResult, TabSuspendedState } from "@/types"
-
-function extractDomain(url: string): string | null {
-  try {
-    return new URL(url).hostname
-  } catch {
-    return null
-  }
-}
-
-function suspendedStateOf(t: ChromeTab): TabSuspendedState | null {
-  if (t.discarded) return "discarded"
-  if (t.frozen) return "frozen"
-  return null
-}
+import { reconcileTabs } from "@/lib/chrome/reconcile"
+import type { ChromeTab, SyncResult } from "@/types"
 
 function isSyncResult(data: unknown): data is SyncResult {
   return (
@@ -56,11 +42,11 @@ export async function syncTabsFromList(
   const now = new Date().toISOString()
   const db = await getDb()
 
+  let ogFetchQueue: { id: string; url: string }[] = []
+  let tweetFetchQueue: { id: string; url: string }[] = []
   let added = 0
   let updated = 0
   let closed = 0
-  const ogFetchQueue: { id: string; url: string }[] = []
-  const tweetFetchQueue: { id: string; url: string }[] = []
 
   // Tab upserts/closes and the "Latest"/"Previous Session" mirror update all
   // run in one transaction, so a failure partway through can never leave the
@@ -75,106 +61,31 @@ export async function syncTabsFromList(
   db.transaction((tx) => {
     const dbTabs = tx.select().from(tabs).where(eq(tabs.status, "open")).all()
 
-    const chromeIdSet = new Set(chromeTabs.map((t) => t.id))
-    const dbChromeIdMap = new Map(dbTabs.map((t) => [t.chromeId, t]))
+    // What changes is decided by a pure planner (see lib/chrome/reconcile.ts);
+    // this block only executes the plan. Keeping the two apart is what makes
+    // the rebind/close rules testable without a database.
+    const plan = reconcileTabs(dbTabs, chromeTabs, { now })
 
-    // Rebind pass: when Chrome restarts (or after data recovery), every tab id
-    // changes at once. Rebind by exact URL match instead of closing and
-    // reinserting all tabs. Open rows with a null chromeId are candidates too.
-    const missingByUrl = new Map<string, (typeof dbTabs)[number][]>()
-    for (const dbTab of dbTabs) {
-      if (!dbTab.chromeId || !chromeIdSet.has(dbTab.chromeId)) {
-        const list = missingByUrl.get(dbTab.url)
-        if (list) list.push(dbTab)
-        else missingByUrl.set(dbTab.url, [dbTab])
-      }
-    }
-    const reboundDbIds = new Set<string>()
-    for (const chromeTab of chromeTabs) {
-      if (dbChromeIdMap.has(chromeTab.id)) continue
-      const dbTab = missingByUrl.get(chromeTab.url)?.shift()
-      if (dbTab) {
-        reboundDbIds.add(dbTab.id)
-        dbChromeIdMap.set(chromeTab.id, dbTab)
-      }
+    for (const values of plan.inserts) {
+      tx.insert(tabs).values(values).run()
     }
 
-    for (const chromeTab of chromeTabs) {
-      const existing = dbChromeIdMap.get(chromeTab.id)
-      const domain = extractDomain(chromeTab.url)
-
-      if (existing) {
-        tx.update(tabs)
-          .set({
-            chromeId: chromeTab.id,
-            url: chromeTab.url,
-            title: chromeTab.title,
-            domain,
-            faviconUrl: chromeTab.faviconUrl || existing.faviconUrl,
-            windowId: chromeTab.windowId ?? null,
-            tabIndex: chromeTab.tabIndex ?? null,
-            lastAccessedAt: chromeTab.lastAccessedAt ?? existing.lastAccessedAt,
-            suspendedState: suspendedStateOf(chromeTab),
-            lastSeenAt: now,
-            updatedAt: now,
-          })
-          .where(eq(tabs.id, existing.id))
-          .run()
-
-        // Queue enrichment: OG images for any http(s) tab never checked
-        // (ogImage null; "" means checked-and-none) or whose URL changed.
-        if (isTweetUrl(domain) && !existing.description) {
-          tweetFetchQueue.push({ id: existing.id, url: chromeTab.url })
-        } else if (
-          /^https?:/i.test(chromeTab.url) &&
-          (existing.ogImage === null || existing.url !== chromeTab.url)
-        ) {
-          ogFetchQueue.push({ id: existing.id, url: chromeTab.url })
-        }
-        updated++
-      } else {
-        const id = nanoid()
-        tx.insert(tabs)
-          .values({
-            id,
-            chromeId: chromeTab.id,
-            url: chromeTab.url,
-            title: chromeTab.title,
-            domain,
-            faviconUrl: chromeTab.faviconUrl || null,
-            windowId: chromeTab.windowId ?? null,
-            tabIndex: chromeTab.tabIndex ?? null,
-            lastAccessedAt: chromeTab.lastAccessedAt ?? null,
-            suspendedState: suspendedStateOf(chromeTab),
-            status: "open",
-            type: chromeTab.type,
-            firstSeenAt: now,
-            lastSeenAt: now,
-            createdAt: now,
-            updatedAt: now,
-          })
-          .run()
-
-        if (isTweetUrl(domain)) {
-          tweetFetchQueue.push({ id, url: chromeTab.url })
-        } else if (/^https?:/i.test(chromeTab.url)) {
-          ogFetchQueue.push({ id, url: chromeTab.url })
-        }
-        added++
-      }
+    for (const { id, values } of plan.updates) {
+      tx.update(tabs).set(values).where(eq(tabs.id, id)).run()
     }
 
-    // Close every open row that matched nothing this sync — by chromeId or
-    // rebind — so the DB "open" set mirrors Chrome even for null-chromeId rows.
-    for (const dbTab of dbTabs) {
-      if ((!dbTab.chromeId || !chromeIdSet.has(dbTab.chromeId)) && !reboundDbIds.has(dbTab.id)) {
-        tx.update(tabs)
-          .set({ status: "closed", closedAt: now, chromeId: null, updatedAt: now })
-          .where(eq(tabs.id, dbTab.id))
-          .run()
-        closed++
-      }
+    for (const id of plan.closes) {
+      tx.update(tabs)
+        .set({ status: "closed", closedAt: now, chromeId: null, updatedAt: now })
+        .where(eq(tabs.id, id))
+        .run()
     }
+
+    ogFetchQueue = plan.ogFetch
+    tweetFetchQueue = plan.tweetFetch
+    added = plan.inserts.length
+    updated = plan.updates.length
+    closed = plan.closes.length
 
     // dbTabs — the open set as it stood before this sync's mutations — is the
     // authoritative "what was open before" source for isStartup's
