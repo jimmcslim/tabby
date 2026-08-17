@@ -43,6 +43,30 @@ export function isTweetUrl(domain: string | null): boolean {
   return TWEET_DOMAINS.has(domain)
 }
 
+/**
+ * The preview image a page declares for itself: og:image, else twitter:image.
+ * Attribute order varies between sites, so each is matched both ways round.
+ */
+export function parseOgImage(html: string): string | null {
+  // Try og:image first
+  const ogMatch = html.match(
+    /<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i
+  ) || html.match(
+    /<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i
+  )
+  if (ogMatch?.[1]) return ogMatch[1]
+
+  // Try twitter:image
+  const twMatch = html.match(
+    /<meta[^>]*name=["']twitter:image["'][^>]*content=["']([^"']+)["']/i
+  ) || html.match(
+    /<meta[^>]*content=["']([^"']+)["'][^>]*name=["']twitter:image["']/i
+  )
+  if (twMatch?.[1]) return twMatch[1]
+
+  return null
+}
+
 export async function fetchOgImage(url: string): Promise<string | null> {
   try {
     const res = await fetch(url, {
@@ -53,25 +77,7 @@ export async function fetchOgImage(url: string): Promise<string | null> {
     })
     if (!res.ok) return null
 
-    const html = await res.text()
-
-    // Try og:image first
-    const ogMatch = html.match(
-      /<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i
-    ) || html.match(
-      /<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i
-    )
-    if (ogMatch?.[1]) return ogMatch[1]
-
-    // Try twitter:image
-    const twMatch = html.match(
-      /<meta[^>]*name=["']twitter:image["'][^>]*content=["']([^"']+)["']/i
-    ) || html.match(
-      /<meta[^>]*content=["']([^"']+)["'][^>]*name=["']twitter:image["']/i
-    )
-    if (twMatch?.[1]) return twMatch[1]
-
-    return null
+    return parseOgImage(await res.text())
   } catch {
     return null
   }
@@ -102,7 +108,8 @@ interface SyndicationTweet {
   }[]
 }
 
-function extractTweetId(url: string): string | null {
+/** The numeric status id in a tweet permalink, or null if there isn't one. */
+export function extractTweetId(url: string): string | null {
   const match = url.match(/\/status\/(\d+)/)
   return match?.[1] || null
 }
