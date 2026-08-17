@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
   const db = await getDb()
   const { tabId } = await request.json()
 
-  const tab = db.select().from(tabs).where(eq(tabs.id, tabId)).get()
+  const [tab] = await db.select().from(tabs).where(eq(tabs.id, tabId)).limit(1)
   if (!tab || !tab.chromeId) {
     return NextResponse.json({ error: "Tab not found or not open in Chrome" }, { status: 404 })
   }
@@ -16,10 +16,10 @@ export async function POST(request: NextRequest) {
   try {
     await closeTab(tab.chromeId)
     const now = new Date().toISOString()
-    db.update(tabs)
+    await db
+      .update(tabs)
       .set({ status: "closed", closedAt: now, chromeId: null, updatedAt: now })
       .where(eq(tabs.id, tabId))
-      .run()
     return NextResponse.json({ success: true })
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to close tab"

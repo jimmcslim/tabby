@@ -10,15 +10,14 @@ export async function GET(
   const db = await getDb()
   const { sessionId } = await params
 
-  const session = db.select().from(sessions).where(eq(sessions.id, sessionId)).get()
+  const [session] = await db.select().from(sessions).where(eq(sessions.id, sessionId)).limit(1)
   if (!session) return NextResponse.json({ error: "Session not found" }, { status: 404 })
 
-  const tabs = db
+  const tabs = await db
     .select()
     .from(sessionTabs)
     .where(eq(sessionTabs.sessionId, sessionId))
     .orderBy(asc(sessionTabs.position))
-    .all()
 
   const exportData = {
     version: 1,

@@ -12,8 +12,8 @@ export async function PATCH(
   const body = await request.json()
   const now = new Date().toISOString()
 
-  db.update(groups).set({ ...body, updatedAt: now }).where(eq(groups.id, groupId)).run()
-  const updated = db.select().from(groups).where(eq(groups.id, groupId)).get()
+  await db.update(groups).set({ ...body, updatedAt: now }).where(eq(groups.id, groupId))
+  const [updated] = await db.select().from(groups).where(eq(groups.id, groupId)).limit(1)
   return NextResponse.json(updated)
 }
 
@@ -23,6 +23,6 @@ export async function DELETE(
 ) {
   const db = await getDb()
   const { groupId } = await params
-  db.delete(groups).where(eq(groups.id, groupId)).run()
+  await db.delete(groups).where(eq(groups.id, groupId))
   return NextResponse.json({ success: true })
 }

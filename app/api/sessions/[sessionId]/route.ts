@@ -9,15 +9,14 @@ export async function GET(_request: NextRequest, { params }: Params) {
   const db = await getDb()
   const { sessionId } = await params
 
-  const session = db.select().from(sessions).where(eq(sessions.id, sessionId)).get()
+  const [session] = await db.select().from(sessions).where(eq(sessions.id, sessionId)).limit(1)
   if (!session) return NextResponse.json({ error: "Session not found" }, { status: 404 })
 
-  const tabs = db
+  const tabs = await db
     .select()
     .from(sessionTabs)
     .where(eq(sessionTabs.sessionId, sessionId))
     .orderBy(asc(sessionTabs.position))
-    .all()
 
   return NextResponse.json({ ...session, tabs })
 }
@@ -27,17 +26,17 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   const { sessionId } = await params
   const { name } = await request.json()
 
-  const session = db.select().from(sessions).where(eq(sessions.id, sessionId)).get()
+  const [session] = await db.select().from(sessions).where(eq(sessions.id, sessionId)).limit(1)
   if (!session) return NextResponse.json({ error: "Session not found" }, { status: 404 })
   if (session.isAuto) return NextResponse.json({ error: "Cannot rename auto-session" }, { status: 400 })
 
   const now = new Date().toISOString()
-  db.update(sessions)
+  await db
+    .update(sessions)
     .set({ name: name.trim(), updatedAt: now })
     .where(eq(sessions.id, sessionId))
-    .run()
 
-  const updated = db.select().from(sessions).where(eq(sessions.id, sessionId)).get()
+  const [updated] = await db.select().from(sessions).where(eq(sessions.id, sessionId)).limit(1)
   return NextResponse.json(updated)
 }
 
@@ -45,10 +44,10 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
   const db = await getDb()
   const { sessionId } = await params
 
-  const session = db.select().from(sessions).where(eq(sessions.id, sessionId)).get()
+  const [session] = await db.select().from(sessions).where(eq(sessions.id, sessionId)).limit(1)
   if (!session) return NextResponse.json({ error: "Session not found" }, { status: 404 })
   if (session.isAuto) return NextResponse.json({ error: "Cannot delete auto-session" }, { status: 400 })
 
-  db.delete(sessions).where(eq(sessions.id, sessionId)).run()
+  await db.delete(sessions).where(eq(sessions.id, sessionId))
   return NextResponse.json({ success: true })
 }

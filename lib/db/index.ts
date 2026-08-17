@@ -4,7 +4,13 @@ import fs from "fs"
 import path from "path"
 
 type DB = BunSQLiteDatabase<typeof schema>
-/** Transaction handle passed to `db.transaction()` callbacks — for call sites that take one as a parameter. */
+/**
+ * Transaction handle passed to `db.transaction()` callbacks — for call sites
+ * that take one as a parameter. Callees receiving a `Tx` must stay
+ * synchronous (`.all()`/`.get()`/`.run()`, no `await`) until the driver
+ * swaps off bun:sqlite: its sync transaction() discards an async callback's
+ * returned Promise and commits before any awaited work resolves.
+ */
 export type Tx = Parameters<Parameters<DB["transaction"]>[0]>[0]
 
 const DB_PATH = process.env.DATABASE_PATH || path.join(process.cwd(), "data", "tabby.db")

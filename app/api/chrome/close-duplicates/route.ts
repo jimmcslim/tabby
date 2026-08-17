@@ -7,7 +7,7 @@ import { NextResponse } from "next/server"
 /** GET: returns duplicate counts without closing anything */
 export async function GET() {
   const db = await getDb()
-  const openTabs = db.select().from(tabs).where(eq(tabs.status, "open")).all()
+  const openTabs = await db.select().from(tabs).where(eq(tabs.status, "open"))
 
   const seen = new Map<string, typeof openTabs>()
   for (const tab of openTabs) {
@@ -28,7 +28,7 @@ export async function GET() {
 /** POST: close all duplicate tabs (keeps the first occurrence) */
 export async function POST() {
   const db = await getDb()
-  const openTabs = db.select().from(tabs).where(eq(tabs.status, "open")).all()
+  const openTabs = await db.select().from(tabs).where(eq(tabs.status, "open"))
 
   const seen = new Map<string, boolean>()
   const toClose: typeof openTabs = []
@@ -47,10 +47,10 @@ export async function POST() {
   for (const tab of toClose) {
     try {
       if (tab.chromeId) await closeTab(tab.chromeId)
-      db.update(tabs)
+      await db
+        .update(tabs)
         .set({ status: "closed", closedAt: now, chromeId: null, updatedAt: now })
         .where(eq(tabs.id, tab.id))
-        .run()
       closed++
     } catch {
       // skip tabs that fail to close

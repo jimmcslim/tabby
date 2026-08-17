@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
   const hours = parseInt(request.nextUrl.searchParams.get("hours") || "24", 10)
   const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString()
 
-  const staleTabs = db
+  const staleTabs = await db
     .select()
     .from(tabs)
     .where(
@@ -24,7 +24,6 @@ export async function GET(request: NextRequest) {
         lt(sql`COALESCE(${tabs.lastAccessedAt}, ${tabs.firstSeenAt})`, cutoff),
       ),
     )
-    .all()
 
   return NextResponse.json({ tabs: staleTabs, count: staleTabs.length, hours })
 }
@@ -42,19 +41,19 @@ export async function POST(request: NextRequest) {
   let suspended = 0
 
   for (const tabId of tabIds) {
-    const tab = db.select().from(tabs).where(eq(tabs.id, tabId)).get()
+    const [tab] = await db.select().from(tabs).where(eq(tabs.id, tabId)).limit(1)
     if (!tab || tab.status !== "open" || !tab.chromeId) continue
 
     try {
       const newChromeId = await discardTab(tab.chromeId)
-      db.update(tabs)
+      await db
+        .update(tabs)
         .set({
           chromeId: newChromeId ?? tab.chromeId,
           suspendedState: "discarded",
           updatedAt: now,
         })
         .where(eq(tabs.id, tab.id))
-        .run()
       suspended++
     } catch {
       // skip tabs that fail (active tab, extension offline, ...)

@@ -7,7 +7,7 @@ const PREFIX = "window_name:"
 
 export async function GET() {
   const db = await getDb()
-  const rows = db.select().from(settings).where(like(settings.key, `${PREFIX}%`)).all()
+  const rows = await db.select().from(settings).where(like(settings.key, `${PREFIX}%`))
 
   const names: Record<string, string> = {}
   for (const row of rows) {
@@ -30,12 +30,12 @@ export async function PUT(request: NextRequest) {
   const trimmed = name.trim()
 
   if (!trimmed) {
-    db.delete(settings).where(eq(settings.key, key)).run()
+    await db.delete(settings).where(eq(settings.key, key))
   } else {
-    db.insert(settings)
+    await db
+      .insert(settings)
       .values({ key, value: trimmed })
       .onConflictDoUpdate({ target: settings.key, set: { value: trimmed } })
-      .run()
   }
 
   return NextResponse.json({ windowId, name: trimmed || null })

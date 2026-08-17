@@ -35,7 +35,7 @@ export async function GET(
 
   // No capture yet — fall back to the OG image if the tab has one
   const db = await getDb()
-  const tab = db.select().from(tabs).where(eq(tabs.id, tabId)).get()
+  const [tab] = await db.select().from(tabs).where(eq(tabs.id, tabId)).limit(1)
   if (tab?.ogImage) {
     return NextResponse.redirect(tab.ogImage, { status: 302 })
   }

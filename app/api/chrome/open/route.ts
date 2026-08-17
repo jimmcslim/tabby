@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
       updatedAt: now,
     }
 
-    db.insert(tabs).values(newTab).run()
+    await db.insert(tabs).values(newTab)
     return NextResponse.json(newTab)
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to open tab"

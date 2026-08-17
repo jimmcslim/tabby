@@ -8,7 +8,7 @@ const MODEL = process.env.OLLAMA_MODEL || "qwen3.5:latest"
 
 export async function POST() {
   const db = await getDb()
-  const openTabs = db.select().from(tabs).where(eq(tabs.status, "open")).all()
+  const openTabs = await db.select().from(tabs).where(eq(tabs.status, "open"))
 
   if (openTabs.length < 2) {
     return NextResponse.json({ error: "Need at least 2 open tabs" }, { status: 400 })

@@ -17,7 +17,11 @@ function clampInterval(seconds: number): number {
 
 export async function GET() {
   const db = await getDb()
-  const row = db.select().from(settings).where(eq(settings.key, SYNC_INTERVAL_KEY)).get()
+  const [row] = await db
+    .select()
+    .from(settings)
+    .where(eq(settings.key, SYNC_INTERVAL_KEY))
+    .limit(1)
 
   const parsed = row?.value != null ? Number(row.value) : NaN
   const syncIntervalSeconds = Number.isFinite(parsed)
@@ -40,10 +44,10 @@ export async function PUT(request: NextRequest) {
 
   const value = clampInterval(syncIntervalSeconds)
 
-  db.insert(settings)
+  await db
+    .insert(settings)
     .values({ key: SYNC_INTERVAL_KEY, value: String(value) })
     .onConflictDoUpdate({ target: settings.key, set: { value: String(value) } })
-    .run()
 
   return NextResponse.json({ syncIntervalSeconds: value })
 }

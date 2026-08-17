@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "tabIds array required" }, { status: 400 })
   }
 
-  const tabsToClassify = db.select().from(tabs).where(inArray(tabs.id, tabIds)).all()
+  const tabsToClassify = await db.select().from(tabs).where(inArray(tabs.id, tabIds))
 
   if (tabsToClassify.length === 0) {
     return NextResponse.json({ error: "No tabs found" }, { status: 404 })
@@ -49,10 +49,10 @@ export async function POST(request: NextRequest) {
       if (idx >= 0 && idx < tabsToClassify.length && item.category) {
         const tab = tabsToClassify[idx]
         const isArticle = item.isArticle === true
-        db.update(tabs)
+        await db
+          .update(tabs)
           .set({ category: item.category, isArticle, updatedAt: now })
           .where(eq(tabs.id, tab.id))
-          .run()
         results.push({ id: tab.id, category: item.category, isArticle })
       }
     }

@@ -14,12 +14,11 @@ export async function GET(request: NextRequest) {
   if (category) conditions.push(eq(tabs.category, category))
   if (search) conditions.push(like(tabs.title, `%${search}%`))
 
-  const result = db
+  const result = await db
     .select()
     .from(tabs)
     .where(and(...conditions))
     .orderBy(desc(tabs.lastSeenAt))
-    .all()
 
   return NextResponse.json(result)
 }

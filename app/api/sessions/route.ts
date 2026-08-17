@@ -6,11 +6,10 @@ import { NextRequest, NextResponse } from "next/server"
 
 export async function GET() {
   const db = await getDb()
-  const result = db
+  const result = await db
     .select()
     .from(sessions)
     .orderBy(desc(sessions.isAuto), desc(sessions.updatedAt))
-    .all()
   return NextResponse.json(result)
 }
 
@@ -22,7 +21,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Name is required" }, { status: 400 })
   }
 
-  const openTabs = db.select().from(tabs).where(eq(tabs.status, "open")).all()
+  const openTabs = await db.select().from(tabs).where(eq(tabs.status, "open"))
 
   // Deduplicate tabs by URL within this session
   const seen = new Set<string>()
@@ -43,23 +42,21 @@ export async function POST(request: NextRequest) {
     updatedAt: now,
   }
 
-  db.insert(sessions).values(session).run()
+  await db.insert(sessions).values(session)
 
   if (uniqueTabs.length > 0) {
-    db.insert(sessionTabs)
-      .values(
-        uniqueTabs.map((t, i) => ({
-          id: nanoid(),
-          sessionId: session.id,
-          url: t.url,
-          title: t.title,
-          domain: t.domain,
-          faviconUrl: t.faviconUrl,
-          category: t.category,
-          position: i,
-        })),
-      )
-      .run()
+    await db.insert(sessionTabs).values(
+      uniqueTabs.map((t, i) => ({
+        id: nanoid(),
+        sessionId: session.id,
+        url: t.url,
+        title: t.title,
+        domain: t.domain,
+        faviconUrl: t.faviconUrl,
+        category: t.category,
+        position: i,
+      })),
+    )
   }
 
   return NextResponse.json(session, { status: 201 })
