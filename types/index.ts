@@ -9,14 +9,17 @@ export interface ChromeTab {
   tabIndex?: number | null
   /** When the tab was last focused, ISO string */
   lastAccessedAt?: string | null
-  /** True when the tab is parked by a suspender (e.g. Workona) and url was unwrapped */
-  suspended?: boolean
   /** Chrome unloaded the tab from memory (Memory Saver / tabs.discard), or it never loaded */
   discarded?: boolean
   /** Chrome froze the tab's JS execution (Chrome 132+) */
   frozen?: boolean
 }
 
+/**
+ * "suspender" is historical only — it was written by the Workona unwrap, which
+ * was removed once Workona fell out of use. Existing rows still carry it, so
+ * the UI must keep rendering it; nothing produces it any more.
+ */
 export type TabSuspendedState = "suspender" | "discarded" | "frozen"
 
 export interface Tab {

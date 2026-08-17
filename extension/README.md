@@ -5,7 +5,7 @@ Tabby's only Chrome integration — no DevTools Protocol, no debug port, no
 
 - pushes a full tab snapshot to the Tabby server whenever tabs change (debounced
   500ms) plus a safety sync every 30s, including per-tab strip position,
-  last-accessed time, and suspension state (Memory Saver / frozen / Workona),
+  last-accessed time, and suspension state (Memory Saver / frozen),
 - holds an SSE stream open to `/api/extension/events` so focus/close/open/
   suspend commands from the Tabby UI execute instantly,
 - captures the visible tab when you switch to it (`chrome.tabs.captureVisibleTab`)

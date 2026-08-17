@@ -16,7 +16,6 @@ function extractDomain(url: string): string | null {
 }
 
 function suspendedStateOf(t: ChromeTab): TabSuspendedState | null {
-  if (t.suspended) return "suspender"
   if (t.discarded) return "discarded"
   if (t.frozen) return "frozen"
   return null
