@@ -18,6 +18,7 @@ export const tabs = sqliteTable(
     windowId: integer("window_id"),
     tabIndex: integer("tab_index"),
     lastAccessedAt: text("last_accessed_at"),
+    // "suspender" is historical only — see TabSuspendedState in types/index.ts.
     suspendedState: text("suspended_state", { enum: ["suspender", "discarded", "frozen"] }),
     isArticle: integer("is_article", { mode: "boolean" }),
     isPinned: integer("is_pinned", { mode: "boolean" }).notNull().default(false),
