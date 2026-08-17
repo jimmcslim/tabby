@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import type { Tab } from "@/types"
+import type { ClassifyResponse, Tab } from "@/types"
 import { type GroupBy, type SortBy, type SortDir, type TabGroup, groupTabs, sortTabs } from "@/lib/tabs/grouping"
 import { useSyncContext } from "@/components/providers/sync-provider"
 import { Header } from "@/components/layout/header"
@@ -199,8 +199,8 @@ export default function DashboardPage() {
         body: JSON.stringify({ tabIds: Array.from(selectedIds) }),
       })
       if (res.ok) {
-        const data = await res.json()
-        const updates = new Map<string, { category: string; isArticle: boolean }>(data.results?.map((r: any) => [r.id, { category: r.category, isArticle: r.isArticle }]) || [])
+        const data: ClassifyResponse = await res.json()
+        const updates = new Map<string, { category: string; isArticle: boolean }>(data.results?.map((r) => [r.id, { category: r.category, isArticle: r.isArticle }]) || [])
         setTabs((prev) => prev.map((t) => {
           const u = updates.get(t.id)
           return u ? { ...t, category: u.category, isArticle: u.isArticle } : t
@@ -223,8 +223,8 @@ export default function DashboardPage() {
         body: JSON.stringify({ tabIds: unclassified.map((t) => t.id) }),
       })
       if (res.ok) {
-        const data = await res.json()
-        const updates = new Map<string, { category: string; isArticle: boolean }>(data.results?.map((r: any) => [r.id, { category: r.category, isArticle: r.isArticle }]) || [])
+        const data: ClassifyResponse = await res.json()
+        const updates = new Map<string, { category: string; isArticle: boolean }>(data.results?.map((r) => [r.id, { category: r.category, isArticle: r.isArticle }]) || [])
         setTabs((prev) => prev.map((t) => {
           const u = updates.get(t.id)
           return u ? { ...t, category: u.category, isArticle: u.isArticle } : t

@@ -20,15 +20,28 @@ interface SessionDetailSheetProps {
 
 export function SessionDetailSheet({ sessionId, open, onOpenChange, onRestore, onExport }: SessionDetailSheetProps) {
   const [session, setSession] = useState<SessionWithTabs | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [fetchedId, setFetchedId] = useState<string | null>(null)
+
+  // Loading is "open on a session we haven't finished fetching" — derived
+  // rather than a second state set synchronously inside the effect.
+  const loading = open && !!sessionId && fetchedId !== sessionId
 
   useEffect(() => {
     if (!sessionId || !open) return
-    setLoading(true)
+    let cancelled = false
     fetch(`/api/sessions/${sessionId}`)
       .then((r) => r.json())
-      .then(setSession)
-      .finally(() => setLoading(false))
+      .then((data: SessionWithTabs) => {
+        if (cancelled) return
+        setSession(data)
+        setFetchedId(sessionId)
+      })
+      .catch(() => {
+        if (!cancelled) setFetchedId(sessionId)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [sessionId, open])
 
   if (!session && !loading) return null

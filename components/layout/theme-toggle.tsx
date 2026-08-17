@@ -1,16 +1,14 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import { useTheme } from "next-themes"
 import { Button } from "@/components/ui/button"
+import { useHydrated } from "@/hooks/use-hydrated"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { Sun03Icon, Moon02Icon } from "@hugeicons/core-free-icons"
 
 export function ThemeToggle() {
-  const [mounted, setMounted] = useState(false)
+  const mounted = useHydrated()
   const { resolvedTheme, setTheme } = useTheme()
-
-  useEffect(() => setMounted(true), [])
 
   if (!mounted) return <div className="size-8" />
 

@@ -172,6 +172,12 @@ export interface SessionExport {
   }
 }
 
+/** Response body of POST /api/ai/classify */
+export interface ClassifyResponse {
+  classified: number
+  results: Array<{ id: string; category: string; isArticle: boolean }>
+}
+
 export type TabCategory =
   | "work"
   | "social"
