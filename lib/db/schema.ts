@@ -1,30 +1,40 @@
-import { sqliteTable, text, integer, primaryKey } from "drizzle-orm/sqlite-core"
+import { index, integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core"
 
-export const tabs = sqliteTable("tabs", {
-  id: text("id").primaryKey(),
-  chromeId: text("chrome_id"),
-  url: text("url").notNull(),
-  title: text("title"),
-  domain: text("domain"),
-  faviconUrl: text("favicon_url"),
-  status: text("status").notNull().default("open"),
-  type: text("type").notNull().default("page"),
-  category: text("category"),
-  summary: text("summary"),
-  ogImage: text("og_image"),
-  description: text("description"),
-  windowId: integer("window_id"),
-  tabIndex: integer("tab_index"),
-  lastAccessedAt: text("last_accessed_at"),
-  suspendedState: text("suspended_state", { enum: ["suspender", "discarded", "frozen"] }),
-  isArticle: integer("is_article", { mode: "boolean" }),
-  isPinned: integer("is_pinned", { mode: "boolean" }).notNull().default(false),
-  firstSeenAt: text("first_seen_at").notNull(),
-  lastSeenAt: text("last_seen_at").notNull(),
-  closedAt: text("closed_at"),
-  createdAt: text("created_at").notNull(),
-  updatedAt: text("updated_at").notNull(),
-})
+export const tabs = sqliteTable(
+  "tabs",
+  {
+    id: text("id").primaryKey(),
+    chromeId: text("chrome_id"),
+    url: text("url").notNull(),
+    title: text("title"),
+    domain: text("domain"),
+    faviconUrl: text("favicon_url"),
+    status: text("status").notNull().default("open"),
+    type: text("type").notNull().default("page"),
+    category: text("category"),
+    summary: text("summary"),
+    ogImage: text("og_image"),
+    description: text("description"),
+    windowId: integer("window_id"),
+    tabIndex: integer("tab_index"),
+    lastAccessedAt: text("last_accessed_at"),
+    suspendedState: text("suspended_state", { enum: ["suspender", "discarded", "frozen"] }),
+    isArticle: integer("is_article", { mode: "boolean" }),
+    isPinned: integer("is_pinned", { mode: "boolean" }).notNull().default(false),
+    firstSeenAt: text("first_seen_at").notNull(),
+    lastSeenAt: text("last_seen_at").notNull(),
+    closedAt: text("closed_at"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  // Declared here so migrations reproduce the indexes the old bootstrap DDL created.
+  (table) => [
+    index("idx_tabs_status").on(table.status),
+    index("idx_tabs_chrome_id").on(table.chromeId),
+    index("idx_tabs_domain").on(table.domain),
+    index("idx_tabs_category").on(table.category),
+  ],
+)
 
 export const groups = sqliteTable("groups", {
   id: text("id").primaryKey(),
@@ -60,18 +70,22 @@ export const sessions = sqliteTable("sessions", {
   updatedAt: text("updated_at").notNull(),
 })
 
-export const sessionTabs = sqliteTable("session_tabs", {
-  id: text("id").primaryKey(),
-  sessionId: text("session_id")
-    .notNull()
-    .references(() => sessions.id, { onDelete: "cascade" }),
-  url: text("url").notNull(),
-  title: text("title"),
-  domain: text("domain"),
-  faviconUrl: text("favicon_url"),
-  category: text("category"),
-  position: integer("position").notNull().default(0),
-})
+export const sessionTabs = sqliteTable(
+  "session_tabs",
+  {
+    id: text("id").primaryKey(),
+    sessionId: text("session_id")
+      .notNull()
+      .references(() => sessions.id, { onDelete: "cascade" }),
+    url: text("url").notNull(),
+    title: text("title"),
+    domain: text("domain"),
+    faviconUrl: text("favicon_url"),
+    category: text("category"),
+    position: integer("position").notNull().default(0),
+  },
+  (table) => [index("idx_session_tabs_session_id").on(table.sessionId)],
+)
 
 export const settings = sqliteTable("settings", {
   key: text("key").primaryKey(),
