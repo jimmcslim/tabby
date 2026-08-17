@@ -23,7 +23,8 @@ function timeAgo(date: Date): string {
 }
 
 export function Header({ title, searchValue, onSearchChange, children }: HeaderProps) {
-  const { lastSync, isSyncing, triggerSync } = useSyncContext()
+  const { lastSync, isSyncing, triggerSync, chromeStatus } = useSyncContext()
+  const restoreProgress = chromeStatus?.restoring ? chromeStatus.restoreProgress : undefined
 
   return (
     <header className="flex items-center gap-4 border-b px-8 py-4">
@@ -44,7 +45,12 @@ export function Header({ title, searchValue, onSearchChange, children }: HeaderP
           />
         </Button>
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          {isSyncing ? (
+          {chromeStatus?.restoring ? (
+            <>
+              <div className="size-1.5 animate-pulse rounded-full bg-blue-500" />
+              Restoring{restoreProgress ? ` ${restoreProgress.restored}/${restoreProgress.total}` : "..."}
+            </>
+          ) : isSyncing ? (
             <>
               <div className="size-1.5 animate-pulse rounded-full bg-amber-500" />
               Syncing...

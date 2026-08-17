@@ -76,6 +76,9 @@ export interface ChromeStatus {
     lastReportAt: string | null
     version?: string
   }
+  /** True while a session restore is in progress (any client, not just the caller) */
+  restoring?: boolean
+  restoreProgress?: { total: number; restored: number }
 }
 
 // --- Chrome extension bridge protocol ---
@@ -97,6 +100,14 @@ export interface ExtensionCommand {
   url?: string
   /** Target chrome.windows id for "open" */
   windowId?: number
+  /** Whether the created tab should become active (defaults true) — "open" only */
+  active?: boolean
+  /** Open behind the extension's suspended.html placeholder instead of loading url — "open" only */
+  suspend?: boolean
+  /** Saved title to show on the suspended placeholder — "open" only */
+  title?: string
+  /** Saved favicon to show on the suspended placeholder — "open" only */
+  faviconUrl?: string
 }
 
 /** POST body the extension sends to /api/extension/ack */

@@ -1,4 +1,4 @@
-import { getBridge, isExtensionSseConnected, isExtensionFresh } from "@/lib/extension/bridge"
+import { getBridge, isExtensionSseConnected, isExtensionFresh, isRestoreLocked } from "@/lib/extension/bridge"
 import { NextResponse } from "next/server"
 import type { ChromeStatus } from "@/types"
 
@@ -6,6 +6,7 @@ export async function GET() {
   const bridge = getBridge()
   const sse = isExtensionSseConnected()
   const connected = sse || isExtensionFresh()
+  const restoring = isRestoreLocked()
 
   const status: ChromeStatus = {
     connected,
@@ -18,6 +19,8 @@ export async function GET() {
       lastReportAt: bridge.lastReportAt ? new Date(bridge.lastReportAt).toISOString() : null,
       version: bridge.extensionVersion,
     },
+    restoring,
+    restoreProgress: restoring ? (bridge.restoreProgress ?? undefined) : undefined,
   }
   return NextResponse.json(status)
 }

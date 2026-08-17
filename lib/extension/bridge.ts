@@ -16,6 +16,8 @@ interface Bridge {
   extensionVersion?: string
   /** Epoch ms until which the heavy sync pipeline is suppressed (bulk restore) */
   restoreLockUntil: number | null
+  /** Progress of the in-flight restore, if any — for UI display only */
+  restoreProgress: { total: number; restored: number } | null
 }
 
 // Survives route-handler module duplication in dev, same pattern as getDb
@@ -31,6 +33,7 @@ export function getBridge(): Bridge {
       lastReportAt: null,
       lastSyncResult: null,
       restoreLockUntil: null,
+      restoreProgress: null,
     } satisfies Bridge
   }
   return g[BRIDGE_KEY] as Bridge
@@ -57,6 +60,15 @@ export function releaseRestoreLock(): void {
 export function isRestoreLocked(): boolean {
   const { restoreLockUntil } = getBridge()
   return restoreLockUntil !== null && Date.now() < restoreLockUntil
+}
+
+/** Report restore progress for UI display — cleared by the restore route's `finally`. */
+export function setRestoreProgress(total: number, restored: number): void {
+  getBridge().restoreProgress = { total, restored }
+}
+
+export function clearRestoreProgress(): void {
+  getBridge().restoreProgress = null
 }
 
 /** True when the extension pushed a snapshot recently (covers SSE reconnect gaps) */

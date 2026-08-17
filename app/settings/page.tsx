@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useSyncContext } from "@/components/providers/sync-provider"
 import { Header } from "@/components/layout/header"
 import { Button } from "@/components/ui/button"
@@ -11,12 +11,23 @@ import { CheckmarkCircle01Icon, Cancel01Icon } from "@hugeicons/core-free-icons"
 import { cn } from "@/lib/utils"
 
 export default function SettingsPage() {
-  const { chromeStatus } = useSyncContext()
+  const { chromeStatus, syncIntervalMs, setSyncInterval } = useSyncContext()
 
   const [ollamaUrl, setOllamaUrl] = useState("http://localhost:11434")
   const [ollamaTestResult, setOllamaTestResult] = useState<boolean | null>(null)
+  const [syncSeconds, setSyncSeconds] = useState(String(Math.round(syncIntervalMs / 1000)))
 
   const extension = chromeStatus?.extension
+
+  // Keep the input in sync when the persisted value loads/changes elsewhere.
+  useEffect(() => {
+    setSyncSeconds(String(Math.round(syncIntervalMs / 1000)))
+  }, [syncIntervalMs])
+
+  const saveSyncInterval = useCallback(() => {
+    const seconds = Number(syncSeconds)
+    if (Number.isFinite(seconds)) setSyncInterval(seconds)
+  }, [syncSeconds, setSyncInterval])
 
   const testOllama = useCallback(async () => {
     try {
@@ -71,6 +82,38 @@ export default function SettingsPage() {
                 </ol>
               </div>
             )}
+          </section>
+
+          <Separator />
+
+          {/* Sync */}
+          <section className="space-y-4">
+            <div>
+              <h2 className="text-lg font-semibold">Sync</h2>
+              <p className="text-sm text-muted-foreground">
+                How often the app refreshes: it re-checks the Chrome connection and pulls a fresh
+                snapshot of your tabs. Lower is snappier but makes more frequent requests and AI
+                work; higher is quieter but the view can look stale for longer.
+              </p>
+            </div>
+
+            <div className="flex items-end gap-3">
+              <div className="flex-1 space-y-1.5">
+                <label className="text-sm font-medium">Sync frequency (seconds)</label>
+                <Input
+                  type="number"
+                  min={5}
+                  max={3600}
+                  value={syncSeconds}
+                  onChange={(e) => setSyncSeconds(e.target.value)}
+                  onBlur={saveSyncInterval}
+                  placeholder="30"
+                />
+              </div>
+              <Button variant="outline" onClick={saveSyncInterval}>
+                Save
+              </Button>
+            </div>
           </section>
 
           <Separator />

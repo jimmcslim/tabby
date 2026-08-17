@@ -59,3 +59,37 @@ export async function openTab(url?: string, windowId?: number): Promise<ChromeTa
     windowId: data.windowId ?? null,
   }
 }
+
+/**
+ * Open a tab behind the extension's suspended.html placeholder — the tab
+ * shows the saved title/favicon but never loads `url` until it's activated.
+ * Used by session restore so reopening hundreds of tabs doesn't load them all
+ * at once (mirrors Chrome's own lazy session-restore behavior).
+ */
+export async function openSuspendedTab(
+  url: string,
+  title?: string,
+  faviconUrl?: string,
+): Promise<ChromeTab> {
+  requireExtension()
+  const data = (await dispatchCommand({
+    type: "open",
+    url,
+    title,
+    faviconUrl,
+    suspend: true,
+    active: false,
+  })) as {
+    id: string
+    windowId?: number
+    url?: string
+    title?: string
+  }
+  return {
+    id: data.id,
+    type: "page",
+    title: data.title || title || url,
+    url: data.url || url,
+    windowId: data.windowId ?? null,
+  }
+}

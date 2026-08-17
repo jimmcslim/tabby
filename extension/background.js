@@ -54,7 +54,35 @@ function isTabbyTab(t, baseUrl) {
   }
 }
 
+// Restored tabs point at this bundled placeholder (see extension/suspended.js)
+// until the user actually visits them — unwrap it back to the real page so the
+// rest of the app (tab list, dedup, OG/AI) always sees real URLs.
+const SUSPENDED_URL_PREFIX = chrome.runtime.getURL("suspended.html")
+
+function decodeSuspended(url) {
+  if (!url || !url.startsWith(SUSPENDED_URL_PREFIX)) return null
+  const params = new URL(url).searchParams
+  const realUrl = params.get("u")
+  if (!realUrl) return null
+  return { url: realUrl, title: params.get("t") || null, faviconUrl: params.get("f") || null }
+}
+
 function tabToChromeTab(t) {
+  const suspended = decodeSuspended(t.url || t.pendingUrl)
+  if (suspended) {
+    return {
+      id: "ext:" + t.id,
+      type: "page",
+      title: t.title && t.title !== suspended.url ? t.title : suspended.title || suspended.url,
+      url: suspended.url,
+      faviconUrl: suspended.faviconUrl,
+      windowId: t.windowId,
+      tabIndex: t.index,
+      lastAccessedAt: t.lastAccessed ? new Date(t.lastAccessed).toISOString() : null,
+      discarded: true,
+      frozen: !!t.frozen,
+    }
+  }
   return {
     id: "ext:" + t.id,
     type: "page",
@@ -194,16 +222,24 @@ async function executeCommand(command) {
         break
       }
       case "open": {
-        const createProps = {}
-        if (command.url) createProps.url = command.url
+        const createProps = { active: command.active ?? true }
         if (command.windowId) createProps.windowId = command.windowId
+        if (command.suspend && command.url) {
+          const suspendParams = new URLSearchParams({ u: command.url })
+          if (command.title) suspendParams.set("t", command.title)
+          if (command.faviconUrl) suspendParams.set("f", command.faviconUrl)
+          createProps.url = chrome.runtime.getURL("suspended.html") + "?" + suspendParams.toString()
+        } else if (command.url) {
+          createProps.url = command.url
+        }
         const tab = await chrome.tabs.create(createProps)
         if (command.windowId) await chrome.windows.update(tab.windowId, { focused: true })
         ack.data = {
           id: "ext:" + tab.id,
           windowId: tab.windowId,
-          url: tab.pendingUrl || tab.url || command.url || "chrome://newtab/",
-          title: tab.title || command.url || "New tab",
+          // Report the real url/title, never the suspended.html placeholder.
+          url: command.url || tab.pendingUrl || tab.url || "chrome://newtab/",
+          title: command.title || tab.title || command.url || "New tab",
         }
         break
       }
