@@ -11,7 +11,9 @@ concurrency:
 
 jobs:
   check:
-    name: typecheck + lint
+    # Kept generic: this is the name branch protection requires, so it
+    # shouldn't have to change every time a step is added.
+    name: checks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -38,3 +40,6 @@ jobs:
 
       - name: Lint
         run: bun run lint
+
+      - name: Test
+        run: bun run test
