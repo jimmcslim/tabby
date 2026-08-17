@@ -29,6 +29,7 @@ export function FaviconImage({ url, domain, size = 32, className }: FaviconImage
   }
 
   return (
+    // eslint-disable-next-line @next/next/no-img-element -- arbitrary remote favicon/screenshot URLs; next/image would need a domain allow-list we can't enumerate
     <img
       src={faviconSrc}
       alt=""

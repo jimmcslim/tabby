@@ -16,9 +16,13 @@ export function EditableGroupHeader({
   const [value, setValue] = useState(group.label)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => {
+  // Reset the draft when the group is renamed elsewhere — adjusted during
+  // render rather than in an effect (https://react.dev/learn/you-might-not-need-an-effect).
+  const [lastLabel, setLastLabel] = useState(group.label)
+  if (lastLabel !== group.label) {
+    setLastLabel(group.label)
     setValue(group.label)
-  }, [group.label])
+  }
 
   useEffect(() => {
     if (editing) inputRef.current?.select()

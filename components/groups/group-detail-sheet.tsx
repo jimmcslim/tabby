@@ -18,20 +18,34 @@ interface GroupDetailSheetProps {
 }
 
 export function GroupDetailSheet({ group, open, onOpenChange, onUpdated }: GroupDetailSheetProps) {
-  const [tabs, setTabs] = useState<Tab[]>([])
-  const [loading, setLoading] = useState(false)
+  // null means "not fetched yet", which is also what drives the loading state —
+  // deriving it keeps the effect free of synchronous setState.
+  const [loadedTabs, setLoadedTabs] = useState<Tab[] | null>(null)
+  const isOpen = open && !!group
+  const tabs = loadedTabs ?? []
+  const loading = isOpen && loadedTabs === null
+
+  // Drop the tabs on close so the next open doesn't flash the previous group's.
+  const [wasOpen, setWasOpen] = useState(isOpen)
+  if (wasOpen !== isOpen) {
+    setWasOpen(isOpen)
+    if (!isOpen) setLoadedTabs(null)
+  }
 
   useEffect(() => {
-    if (!open || !group) {
-      setTabs([])
-      return
-    }
-    setLoading(true)
+    if (!open || !group) return
+    let cancelled = false
     fetch(`/api/groups/${group.id}/tabs`)
       .then((r) => r.json())
-      .then(setTabs)
-      .catch(() => {})
-      .finally(() => setLoading(false))
+      .then((data: Tab[]) => {
+        if (!cancelled) setLoadedTabs(data)
+      })
+      .catch(() => {
+        if (!cancelled) setLoadedTabs([])
+      })
+    return () => {
+      cancelled = true
+    }
   }, [open, group])
 
   const handleRemoveTab = useCallback(
@@ -42,7 +56,7 @@ export function GroupDetailSheet({ group, open, onOpenChange, onUpdated }: Group
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tabIds: [tabId], action: "remove" }),
       })
-      setTabs((prev) => prev.filter((t) => t.id !== tabId))
+      setLoadedTabs((prev) => (prev ?? []).filter((t) => t.id !== tabId))
       onUpdated()
     },
     [group, onUpdated],

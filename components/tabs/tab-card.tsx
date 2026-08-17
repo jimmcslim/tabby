@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import type { Tab } from "@/types"
 import { FaviconImage } from "@/components/shared/favicon-image"
 import { CategoryBadge } from "@/components/shared/category-badge"
@@ -46,6 +46,7 @@ function TweetPreview({ tweet }: { tweet: TweetData }) {
   // If tweet has an image, use it as the full preview
   if (tweet.imageUrl && !imgError) {
     return (
+      // eslint-disable-next-line @next/next/no-img-element -- arbitrary remote favicon/screenshot URLs; next/image would need a domain allow-list we can't enumerate
       <img
         src={tweet.imageUrl}
         alt=""
@@ -61,6 +62,7 @@ function TweetPreview({ tweet }: { tweet: TweetData }) {
     <div className="flex size-full flex-col justify-center bg-white px-5 py-4 dark:bg-black">
       <div className="mb-2 flex items-center gap-2">
         {tweet.avatarUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- arbitrary remote favicon/screenshot URLs; next/image would need a domain allow-list we can't enumerate
           <img src={tweet.avatarUrl} alt="" className="size-8 rounded-full" />
         ) : (
           <div className="size-8 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center text-xs font-bold text-zinc-700 dark:text-white">
@@ -107,9 +109,11 @@ function ScreenshotPreview({ tab }: { tab: Tab }) {
   const screenshotSrc = `/api/tabs/${tab.id}/screenshot${
     tab.lastAccessedAt ? `?v=${encodeURIComponent(tab.lastAccessedAt)}` : ""
   }`
-  useEffect(() => {
+  const [lastSrc, setLastSrc] = useState(screenshotSrc)
+  if (lastSrc !== screenshotSrc) {
+    setLastSrc(screenshotSrc)
     setError(false)
-  }, [screenshotSrc])
+  }
 
   // Render tweet card
   if (tweet) return <TweetPreview tweet={tweet} />
@@ -120,6 +124,7 @@ function ScreenshotPreview({ tab }: { tab: Tab }) {
   if (tab.ogImage && shouldPreferOgImage(tab.domain) && !error) {
     return (
       <div className="flex size-full items-center justify-center bg-muted/30">
+        {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary remote favicon/screenshot URLs; next/image would need a domain allow-list we can't enumerate */}
         <img
           src={tab.ogImage}
           alt=""
@@ -140,6 +145,7 @@ function ScreenshotPreview({ tab }: { tab: Tab }) {
   }
 
   return (
+    // eslint-disable-next-line @next/next/no-img-element -- arbitrary remote favicon/screenshot URLs; next/image would need a domain allow-list we can't enumerate
     <img
       key={screenshotSrc}
       src={screenshotSrc}

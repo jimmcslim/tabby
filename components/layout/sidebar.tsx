@@ -2,8 +2,9 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useSyncExternalStore } from "react"
 import { useSyncContext } from "@/components/providers/sync-provider"
+import { useHydrated } from "@/hooks/use-hydrated"
 import { ThemeToggle } from "./theme-toggle"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { HugeiconsIcon } from "@hugeicons/react"
@@ -26,22 +27,30 @@ const navItems = [
   { href: "/settings", label: "Settings", icon: Settings01Icon },
 ]
 
+// The collapsed flag lives in localStorage, an external store: read it with
+// useSyncExternalStore rather than copying it into state from an effect.
+const COLLAPSED_KEY = "sidebar-collapsed"
+const collapsedListeners = new Set<() => void>()
+
+function subscribeCollapsed(onChange: () => void) {
+  collapsedListeners.add(onChange)
+  return () => collapsedListeners.delete(onChange)
+}
+
+function getCollapsed() {
+  return localStorage.getItem(COLLAPSED_KEY) === "true"
+}
+
+function setCollapsed(next: boolean) {
+  localStorage.setItem(COLLAPSED_KEY, String(next))
+  for (const listener of collapsedListeners) listener()
+}
+
 function useCollapsed() {
-  const [collapsed, setCollapsed] = useState(false)
-  const [mounted, setMounted] = useState(false)
+  const mounted = useHydrated()
+  const collapsed = useSyncExternalStore(subscribeCollapsed, getCollapsed, () => false)
 
-  useEffect(() => {
-    setCollapsed(localStorage.getItem("sidebar-collapsed") === "true")
-    setMounted(true)
-  }, [])
-
-  const toggle = useCallback(() => {
-    setCollapsed((prev) => {
-      const next = !prev
-      localStorage.setItem("sidebar-collapsed", String(next))
-      return next
-    })
-  }, [])
+  const toggle = useCallback(() => setCollapsed(!getCollapsed()), [])
 
   return { collapsed, toggle, mounted }
 }

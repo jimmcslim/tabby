@@ -85,6 +85,23 @@ export interface TweetData {
   avatarUrl?: string | null
 }
 
+/** The subset of Twitter's syndication `tweet-result` payload that we read. */
+interface SyndicationTweet {
+  user?: {
+    name?: string
+    screen_name?: string
+    profile_image_url_https?: string
+  }
+  text?: string
+  entities?: {
+    media?: { url?: string }[]
+  }
+  mediaDetails?: {
+    type?: string
+    media_url_https?: string
+  }[]
+}
+
 function extractTweetId(url: string): string | null {
   const match = url.match(/\/status\/(\d+)/)
   return match?.[1] || null
@@ -102,7 +119,7 @@ export async function fetchTweetData(url: string): Promise<TweetData | null> {
     )
     if (!res.ok) return null
 
-    const data = await res.json()
+    const data: SyndicationTweet = await res.json()
 
     const authorName: string = data.user?.name || ""
     const authorHandle = data.user?.screen_name ? `@${data.user.screen_name}` : ""
@@ -110,18 +127,18 @@ export async function fetchTweetData(url: string): Promise<TweetData | null> {
     // Get tweet text, strip t.co links for media
     let text: string = data.text || ""
     // Remove t.co URLs that point to media (pic.twitter.com links)
-    const mediaUrls = (data.entities?.media || []).map((m: any) => m.url)
+    const mediaUrls = (data.entities?.media || []).map((m) => m.url)
     for (const mediaUrl of mediaUrls) {
-      text = text.replace(mediaUrl, "").trim()
+      if (mediaUrl) text = text.replace(mediaUrl, "").trim()
     }
 
     // Get the first image from mediaDetails
-    const mediaDetails: any[] = data.mediaDetails || []
-    const firstImage = mediaDetails.find((m: any) => m.type === "photo" || m.media_url_https)
+    const mediaDetails = data.mediaDetails || []
+    const firstImage = mediaDetails.find((m) => m.type === "photo" || m.media_url_https)
     const imageUrl = firstImage?.media_url_https || null
 
     // Get author avatar
-    const avatarUrl: string = data.user?.profile_image_url_https || null
+    const avatarUrl: string | null = data.user?.profile_image_url_https || null
 
     return {
       authorName,
