@@ -85,6 +85,8 @@ Open [http://localhost:3000](http://localhost:3000). Tabs sync automatically wit
 
 ## Architecture
 
+See [docs/architecture.md](docs/architecture.md) for sequence diagrams of the sync, polling, and command flows.
+
 ### Chrome Extension
 
 Tab state and tab actions flow through the **Tabby Connector** extension ([`extension/`](extension/)), a Manifest V3 service worker:
@@ -105,7 +107,7 @@ On every tab change (debounced) and at least every 30 seconds:
 
 ### Database
 
-SQLite with WAL mode, managed via Drizzle ORM. Tables auto-created on startup.
+SQLite with WAL mode, managed via Drizzle ORM. Migrations run automatically on startup from `lib/db/migrations`.
 
 | Table | Purpose |
 |-------|---------|
@@ -199,6 +201,8 @@ AI capabilities:
 
 | Method | Path | Description |
 |--------|------|-------------|
+| GET | `/api/settings` | Get app settings (sync interval) |
+| PUT | `/api/settings` | Update app settings |
 | GET | `/api/window-names` | Get custom window names |
 | PUT | `/api/window-names` | Set/clear window name |
 
