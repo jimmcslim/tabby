@@ -9,6 +9,8 @@ interface SyncState {
   isSyncing: boolean
   chromeStatus: ChromeStatus | null
   triggerSync: () => Promise<void>
+  /** Re-check Chrome/restore status now, instead of waiting for the next poll. */
+  refreshStatus: () => Promise<void>
   syncIntervalMs: number
   setSyncInterval: (seconds: number) => Promise<void>
 }
@@ -25,6 +27,7 @@ const SyncContext = createContext<SyncState>({
   isSyncing: false,
   chromeStatus: null,
   triggerSync: async () => {},
+  refreshStatus: async () => {},
   syncIntervalMs: DEFAULT_SYNC_INTERVAL_MS,
   setSyncInterval: async () => {},
 })
@@ -52,6 +55,10 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       return false
     }
   }, [])
+
+  const refreshStatus = useCallback(async () => {
+    await checkChromeStatus()
+  }, [checkChromeStatus])
 
   const triggerSync = useCallback(async () => {
     setIsSyncing(true)
@@ -125,6 +132,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         isSyncing,
         chromeStatus,
         triggerSync,
+        refreshStatus,
         syncIntervalMs,
         setSyncInterval,
       }}

@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import { toast } from "sonner"
 import type { Session } from "@/types"
 import { useSyncContext } from "@/components/providers/sync-provider"
 import { Header } from "@/components/layout/header"
@@ -16,7 +17,7 @@ import { HugeiconsIcon } from "@hugeicons/react"
 import { FloppyDiskIcon } from "@hugeicons/core-free-icons"
 
 export default function SessionsPage() {
-  const { lastSync } = useSyncContext()
+  const { lastSync, refreshStatus } = useSyncContext()
   const [sessions, setSessions] = useState<Session[]>([])
   const [loading, setLoading] = useState(true)
   const [saveOpen, setSaveOpen] = useState(false)
@@ -49,8 +50,31 @@ export default function SessionsPage() {
   }, [fetchSessions])
 
   const handleRestore = useCallback(async (id: string) => {
-    await fetch(`/api/sessions/${id}/restore`, { method: "POST" })
-  }, [])
+    // The restore lock is set server-side as soon as the request lands, so
+    // check status shortly after (not after the POST, which runs for the whole
+    // restore) to flip the header to "Restoring" and engage the fast poll.
+    const statusTimer = setTimeout(() => void refreshStatus(), 500)
+    try {
+      const res = await fetch(`/api/sessions/${id}/restore`, { method: "POST" })
+      if (!res.ok) {
+        toast.error(`Restore failed (HTTP ${res.status})`)
+        return
+      }
+      const { restored, total }: { restored: number; total: number } = await res.json()
+      if (total > 0 && restored === 0) {
+        toast.error(`Restore failed: none of ${total} tabs could be opened`)
+      } else if (restored < total) {
+        toast.warning(`Restored ${restored} of ${total} tabs`)
+      } else {
+        toast.success(`Restored ${restored} tab${restored !== 1 ? "s" : ""}`)
+      }
+    } catch {
+      toast.error("Restore failed: could not reach the server")
+    } finally {
+      clearTimeout(statusTimer)
+      void refreshStatus()
+    }
+  }, [refreshStatus])
 
   const handleExport = useCallback((id: string) => {
     window.open(`/api/sessions/${id}/export`, "_blank")
