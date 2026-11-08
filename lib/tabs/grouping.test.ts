@@ -163,11 +163,20 @@ describe("sortTabs", () => {
 })
 
 describe("groupTabs", () => {
+  it("records each group's size as totalCount", () => {
+    const groups = groupTabs(
+      [makeTab({ id: "a", domain: "x.com" }), makeTab({ id: "b", domain: "x.com" }), makeTab({ id: "c", domain: "y.com" })],
+      "domain",
+      {},
+    )
+    expect(groups.map((g) => [g.label, g.totalCount])).toEqual([["x.com", 2], ["y.com", 1]])
+  })
+
   it("returns a single unlabelled group when grouping is off", () => {
     const tabs = [makeTab({ id: "a" }), makeTab({ id: "b" })]
 
     expect(groupTabs(tabs, "none", {})).toEqual([
-      { key: "__all", label: "", editable: false, tabs },
+      { key: "__all", label: "", editable: false, tabs, totalCount: 2 },
     ])
   })
 
@@ -206,6 +215,7 @@ describe("groupTabs", () => {
         label: "Unknown Window",
         editable: false,
         tabs: [expect.objectContaining({ id: "orphan" })],
+        totalCount: 1,
       })
       // The orphan group doesn't consume a window number.
       expect(groups.map((g) => g.label)).toEqual(["Unknown Window", "Window 1", "Window 2"])

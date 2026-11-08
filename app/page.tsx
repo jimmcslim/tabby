@@ -1,9 +1,10 @@
 "use client"
 
-import { useCallback, useState } from "react"
+import { useCallback, useDeferredValue, useMemo, useState } from "react"
 import type { Tab } from "@/types"
 import { useSyncContext } from "@/components/providers/sync-provider"
 import { useTabs } from "@/hooks/use-tabs"
+import { filterGroups, filterTabsByTitle } from "@/lib/tabs/search"
 import { useTabGroups, useTabViewPrefs } from "@/hooks/use-tab-view-prefs"
 import { useTabSelection } from "@/hooks/use-tab-selection"
 import { useClassify } from "@/hooks/use-classify"
@@ -31,10 +32,18 @@ export default function DashboardPage() {
     openTabInWindow,
     replaceTab,
     applyClassifications,
-  } = useTabs(prefs.search)
+  } = useTabs()
+  // Filter the loaded tabs in the browser. The deferred value lets React keep
+  // the input responsive and render the (large) filtered grid at lower priority.
+  const deferredSearch = useDeferredValue(prefs.search)
+  const visibleTabs = useMemo(() => filterTabsByTitle(tabs, deferredSearch), [tabs, deferredSearch])
   const selection = useTabSelection()
-  const classify = useClassify(tabs, applyClassifications)
+  const { deselect } = selection
+  const classify = useClassify(visibleTabs, applyClassifications)
   const groups = useTabGroups(tabs, windowNames, prefs)
+  // Group the full list so labels/order stay put while searching; filter inside
+  // each group (dropping empty ones). Header counts use group.totalCount.
+  const visibleGroups = useMemo(() => filterGroups(groups, deferredSearch), [groups, deferredSearch])
 
   const [detailTab, setDetailTab] = useState<Tab | null>(null)
   const [readerTab, setReaderTab] = useState<Tab | null>(null)
@@ -42,10 +51,12 @@ export default function DashboardPage() {
   const handleClose = useCallback(
     async (tabId: string) => {
       await closeTabs([tabId])
-      selection.deselect([tabId])
+      deselect([tabId])
       setDetailTab((current) => (current?.id === tabId ? null : current))
     },
-    [closeTabs, selection],
+    // `deselect` is stable; depending on the whole `selection` object would
+    // give every card a new onClose each render and defeat TabCard's memo.
+    [closeTabs, deselect],
   )
 
   const handleBulkClose = useCallback(async () => {
@@ -112,21 +123,22 @@ export default function DashboardPage() {
               </div>
             ))}
           </div>
-        ) : tabs.length === 0 ? (
+        ) : visibleTabs.length === 0 ? (
           <EmptyState
-            title={prefs.search ? "No tabs match your search" : "No open tabs found"}
+            title={deferredSearch ? "No tabs match your search" : "No open tabs found"}
             description={
-              prefs.search
+              deferredSearch
                 ? "Try a different search term."
                 : "Open some tabs in Chrome and they'll appear here automatically."
             }
           />
         ) : (
           <div className="space-y-8 pt-8">
-            {groups.map((group) => (
+            {visibleGroups.map((group) => (
               <TabGroupSection
                 key={group.key}
                 group={group}
+                filtered={deferredSearch !== ""}
                 prefs={prefs}
                 selection={selection}
                 onRenameWindow={renameWindow}

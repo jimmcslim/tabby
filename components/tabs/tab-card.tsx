@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { memo, useMemo, useState } from "react"
 import type { Tab } from "@/types"
 import { FaviconImage } from "@/components/shared/favicon-image"
 import { CategoryBadge } from "@/components/shared/category-badge"
@@ -157,7 +157,9 @@ function ScreenshotPreview({ tab }: { tab: Tab }) {
   )
 }
 
-export function TabCard({ tab, isSelected, onSelect, onFocus, onClose, onClassify, onClick, onReopen, onReadArticle }: TabCardProps) {
+// Memoised: a search/filter change re-renders the grid, and with ~1k open tabs
+// only the cards whose props changed should do any work.
+export const TabCard = memo(function TabCard({ tab, isSelected, onSelect, onFocus, onClose, onClassify, onClick, onReopen, onReadArticle }: TabCardProps) {
   return (
     <div
       className={`group relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border bg-card transition-all hover:shadow-lg ${
@@ -288,4 +290,4 @@ export function TabCard({ tab, isSelected, onSelect, onFocus, onClose, onClassif
       </div>
     </div>
   )
-}
+})
