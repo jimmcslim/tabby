@@ -18,6 +18,8 @@ import {
 
 interface TabGroupSectionProps {
   group: TabGroup
+  /** A search filter is narrowing the dashboard. */
+  filtered: boolean
   prefs: UseTabViewPrefs
   selection: UseTabSelection
   onRenameWindow: (windowId: string, name: string) => void
@@ -33,6 +35,7 @@ interface TabGroupSectionProps {
 /** One collapsible group on the dashboard: its sticky header and its tabs. */
 export function TabGroupSection({
   group,
+  filtered,
   prefs,
   selection,
   onRenameWindow,
@@ -70,7 +73,9 @@ export function TabGroupSection({
             <h2 className="text-sm font-medium capitalize text-muted-foreground">{group.label}</h2>
           )}
           <span className="text-xs text-muted-foreground/60">
-            {group.tabs.length} {group.tabs.length === 1 ? "tab" : "tabs"}
+            {filtered
+              ? `filtered to ${group.tabs.length} of ${group.totalCount} ${group.totalCount === 1 ? "tab" : "tabs"}`
+              : `${group.tabs.length} ${group.tabs.length === 1 ? "tab" : "tabs"}`}
           </span>
           <div className="h-px flex-1 bg-border/50" />
           <div className="flex items-center gap-1 opacity-0 transition-all group-hover/section:opacity-100">

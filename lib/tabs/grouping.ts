@@ -9,6 +9,8 @@ export interface TabGroup {
   label: string // display label
   editable: boolean
   tabs: Tab[]
+  /** Tabs in this group before any search filter; `tabs.length` after it. */
+  totalCount: number
 }
 
 // Ascending form of each criterion; sortTabs negates it for descending.
@@ -49,7 +51,7 @@ export function groupTabs(
   groupBy: GroupBy,
   windowNames: Record<string, string>,
 ): TabGroup[] {
-  if (groupBy === "none") return [{ key: "__all", label: "", editable: false, tabs }]
+  if (groupBy === "none") return [{ key: "__all", label: "", editable: false, tabs, totalCount: tabs.length }]
 
   const map = new Map<string, Tab[]>()
   const keyOrder: string[] = []
@@ -81,12 +83,12 @@ export function groupTabs(
     return keyOrder.map((key) => {
       const tabs = map.get(key)!
       if (key === "__unknown") {
-        return { key, label: "Unknown Window", editable: false, tabs }
+        return { key, label: "Unknown Window", editable: false, tabs, totalCount: tabs.length }
       }
       const customName = windowNames[key]
       const label = customName || `Window ${autoIndex}`
       autoIndex++
-      return { key, label, editable: true, tabs }
+      return { key, label, editable: true, tabs, totalCount: tabs.length }
     })
   }
 
@@ -99,6 +101,6 @@ export function groupTabs(
     .map((key) => {
       const tabs = map.get(key)!
       const label = key === "__uncategorized" ? "Uncategorized" : key === "__unknown" ? "Unknown" : key
-      return { key, label, editable: false, tabs }
+      return { key, label, editable: false, tabs, totalCount: tabs.length }
     })
 }

@@ -10,7 +10,7 @@ export interface UseTabs {
   loading: boolean
   /** Per-window display names, keyed by window id. */
   windowNames: Record<string, string>
-  /** Refetch the open tabs for the current search. */
+  /** Refetch all open tabs. */
   refresh: () => Promise<void>
   renameWindow: (windowId: string, name: string) => Promise<void>
   focusTab: (tabId: string) => Promise<void>
@@ -24,11 +24,12 @@ export interface UseTabs {
 }
 
 /**
- * The dashboard's data layer: the open tabs for the current search, their
- * window names, and every mutation that changes them. Refetches whenever the
- * search changes or a sync lands.
+ * The dashboard's data layer: every open tab, their window names, and every
+ * mutation that changes them. Refetches whenever a sync lands. Searching is
+ * not done here — filter the result in the browser (see `filterTabsByTitle`),
+ * so typing never costs a request.
  */
-export function useTabs(search: string): UseTabs {
+export function useTabs(): UseTabs {
   const { lastSync } = useSyncContext()
   const [tabs, setTabs] = useState<Tab[]>([])
   const [windowNames, setWindowNames] = useState<Record<string, string>>({})
@@ -36,16 +37,14 @@ export function useTabs(search: string): UseTabs {
 
   const refresh = useCallback(async () => {
     try {
-      const params = new URLSearchParams({ status: "open" })
-      if (search) params.set("search", search)
-      const res = await fetch(`/api/tabs?${params}`)
+      const res = await fetch("/api/tabs?status=open")
       if (res.ok) setTabs(await res.json())
     } catch {
       // ignore
     } finally {
       setLoading(false)
     }
-  }, [search])
+  }, [])
 
   useEffect(() => {
     refresh()
