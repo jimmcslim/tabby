@@ -6,6 +6,7 @@ import fs from "node:fs"
 import { runDrain, type DrainStore } from "./drain"
 import { createFirecrawlBackend } from "./firecrawl"
 import { checkCaptureUrl, loadDenylist } from "./guards"
+import { createSidecarBackend } from "./playwright"
 import { createCaptureQueue } from "./queue"
 import type { CaptureBackend } from "./types"
 
@@ -16,11 +17,18 @@ import type { CaptureBackend } from "./types"
  */
 
 const DEFAULT_DRAIN_LIMIT = 15
+const DEFAULT_SIDECAR_URL = "http://capture-sidecar:3002"
 
 export function resolveCaptureBackend(env: NodeJS.ProcessEnv = process.env): CaptureBackend | null {
   if (env.TABBY_DISABLE_ENRICHMENT === "1" || env.TABBY_DISABLE_ENRICHMENT === "true") return null
   const apiKey = env.FIRECRAWL_API_KEY?.trim()
-  if (apiKey) return createFirecrawlBackend({ apiKey })
+  // CAPTURE_BACKEND = hosted | sidecar | none. Unset keeps the original
+  // behaviour: hosted when FIRECRAWL_API_KEY is set, otherwise off.
+  const choice = env.CAPTURE_BACKEND?.trim().toLowerCase() || (apiKey ? "hosted" : "none")
+  if (choice === "hosted") return apiKey ? createFirecrawlBackend({ apiKey }) : null
+  if (choice === "sidecar") {
+    return createSidecarBackend({ baseUrl: env.CAPTURE_SIDECAR_URL?.trim() || DEFAULT_SIDECAR_URL })
+  }
   return null
 }
 
@@ -30,7 +38,7 @@ export function resolveDrainLimit(env: NodeJS.ProcessEnv = process.env): number 
   return Number.isFinite(n) && n > 0 ? n : DEFAULT_DRAIN_LIMIT
 }
 
-const dbStore: DrainStore = {
+export const dbStore: DrainStore = {
   async getTab(id) {
     const db = await getDb()
     const [row] = await db
