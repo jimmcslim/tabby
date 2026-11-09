@@ -4,7 +4,9 @@ import { useCallback, useDeferredValue, useMemo, useState } from "react"
 import type { Tab } from "@/types"
 import { useSyncContext } from "@/components/providers/sync-provider"
 import { useTabs } from "@/hooks/use-tabs"
+import { toast } from "sonner"
 import { filterGroups, filterTabsByTitle } from "@/lib/tabs/search"
+import { bulkCloseNeedsConfirm } from "@/lib/tabs/selection"
 import { useTabGroups, useTabViewPrefs } from "@/hooks/use-tab-view-prefs"
 import { useTabSelection } from "@/hooks/use-tab-selection"
 import { useClassify } from "@/hooks/use-classify"
@@ -14,6 +16,7 @@ import { TabGroupSection } from "@/components/tabs/tab-group-section"
 import { TabDetailSheet } from "@/components/tabs/tab-detail-sheet"
 import { ReaderSheet } from "@/components/tabs/reader-sheet"
 import { BulkActionBar } from "@/components/tabs/bulk-action-bar"
+import { CloseSelectedDialog } from "@/components/dialogs/close-selected-dialog"
 import { CardZoomControl } from "@/components/tabs/card-zoom-control"
 import { EmptyState } from "@/components/shared/empty-state"
 
@@ -38,7 +41,7 @@ export default function DashboardPage() {
   const deferredSearch = useDeferredValue(prefs.search)
   const visibleTabs = useMemo(() => filterTabsByTitle(tabs, deferredSearch), [tabs, deferredSearch])
   const selection = useTabSelection()
-  const { deselect } = selection
+  const { deselect, clear: clearSelection } = selection
   const classify = useClassify(visibleTabs, applyClassifications)
   const groups = useTabGroups(tabs, windowNames, prefs)
   // Group the full list so labels/order stay put while searching; filter inside
@@ -59,10 +62,41 @@ export default function DashboardPage() {
     [closeTabs, deselect],
   )
 
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false)
+
+  const closeSelected = useCallback(async () => {
+    const ids = Array.from(selection.selectedIds)
+    await closeTabs(ids)
+    clearSelection()
+    toast.success(`Closed ${ids.length} tab${ids.length !== 1 ? "s" : ""}`)
+  }, [closeTabs, clearSelection, selection.selectedIds])
+
+  // Big selections get a confirmation; small ones close immediately.
   const handleBulkClose = useCallback(async () => {
-    await closeTabs(Array.from(selection.selectedIds))
-    selection.clear()
-  }, [closeTabs, selection])
+    if (bulkCloseNeedsConfirm(selection.count)) setConfirmCloseOpen(true)
+    else await closeSelected()
+  }, [selection.count, closeSelected])
+
+  const handleConfirmBulkClose = useCallback(async () => {
+    setConfirmCloseOpen(false)
+    await closeSelected()
+  }, [closeSelected])
+
+  // Changing the search clears the selection, so it can never hold tabs the
+  // filter has hidden (and a later bulk close would silently take with it).
+  const handleSearchChange = useCallback(
+    (value: string) => {
+      prefs.setSearch(value)
+      clearSelection()
+    },
+    [prefs, clearSelection],
+  )
+
+  const filtered = deferredSearch !== ""
+  const handleSelectAllMatching = useCallback(
+    () => selection.selectMany(visibleTabs.map((t) => t.id)),
+    [selection, visibleTabs],
+  )
 
   const handleGroupClosed = useCallback(
     (closedIds: string[]) => {
@@ -84,12 +118,14 @@ export default function DashboardPage() {
 
   return (
     <>
-      <Header title="Dashboard" searchValue={prefs.search} onSearchChange={prefs.setSearch}>
+      <Header title="Dashboard" searchValue={prefs.search} onSearchChange={handleSearchChange}>
         <DashboardToolbar
           hasTabs={tabs.length > 0}
           prefs={prefs}
           classify={classify}
           onHygieneAction={refresh}
+          matchCount={filtered ? visibleTabs.length : 0}
+          onSelectAllMatching={handleSelectAllMatching}
         />
       </Header>
 
@@ -138,7 +174,7 @@ export default function DashboardPage() {
               <TabGroupSection
                 key={group.key}
                 group={group}
-                filtered={deferredSearch !== ""}
+                filtered={filtered}
                 prefs={prefs}
                 selection={selection}
                 onRenameWindow={renameWindow}
@@ -190,6 +226,13 @@ export default function DashboardPage() {
         onClassify={() => classify.classifyTabs(Array.from(selection.selectedIds))}
         onDeselect={selection.clear}
         classifying={classify.bulkClassifying}
+      />
+
+      <CloseSelectedDialog
+        open={confirmCloseOpen}
+        tabCount={selection.count}
+        onOpenChange={setConfirmCloseOpen}
+        onConfirm={handleConfirmBulkClose}
       />
     </>
   )

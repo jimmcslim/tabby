@@ -6,6 +6,8 @@ export interface UseTabSelection {
   selectedIds: Set<string>
   count: number
   select: (id: string, selected: boolean) => void
+  /** Add every id to the selection (e.g. all tabs matching a search). */
+  selectMany: (ids: string[]) => void
   deselect: (ids: string[]) => void
   clear: () => void
 }
@@ -23,6 +25,10 @@ export function useTabSelection(): UseTabSelection {
     })
   }, [])
 
+  const selectMany = useCallback((ids: string[]) => {
+    setSelectedIds((prev) => new Set([...prev, ...ids]))
+  }, [])
+
   // Called when tabs leave the list (closed individually, in bulk, or by group)
   // so the selection never keeps ids that no longer exist.
   const deselect = useCallback((ids: string[]) => {
@@ -35,5 +41,5 @@ export function useTabSelection(): UseTabSelection {
 
   const clear = useCallback(() => setSelectedIds(new Set()), [])
 
-  return { selectedIds, count: selectedIds.size, select, deselect, clear }
+  return { selectedIds, count: selectedIds.size, select, selectMany, deselect, clear }
 }

@@ -30,6 +30,10 @@ interface DashboardToolbarProps {
   classify: UseClassify
   /** Refetch after a hygiene action closed or suspended tabs. */
   onHygieneAction: () => void
+  /** Tabs matching the active search; 0 when no search is active. */
+  matchCount: number
+  /** Select every tab the search matched. */
+  onSelectAllMatching: () => void
 }
 
 /** The dashboard's header controls: view, grouping, sorting, hygiene, classify. */
@@ -38,11 +42,19 @@ export function DashboardToolbar({
   prefs,
   classify,
   onHygieneAction,
+  matchCount,
+  onSelectAllMatching,
 }: DashboardToolbarProps) {
   if (!hasTabs) return null
 
   return (
     <>
+      {matchCount > 0 && (
+        <Button variant="outline" size="sm" onClick={onSelectAllMatching}>
+          Select all {matchCount} matching
+        </Button>
+      )}
+
       <ToggleGroup
         variant="outline"
         size="sm"
