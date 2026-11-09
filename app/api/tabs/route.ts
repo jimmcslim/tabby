@@ -10,10 +10,6 @@ export async function GET(request: NextRequest) {
   const status = searchParams.get("status") || "open"
   const category = searchParams.get("category")
   const search = searchParams.get("search")
-  // Paged mode is opt-in (`limit` and/or `cursor`) and returns
-  // `{ tabs, nextCursor }`; without either, the response is the plain array
-  // every existing caller expects.
-  const paged = searchParams.has("limit") || searchParams.has("cursor")
 
   const conditions = [eq(tabs.status, status)]
   if (category) conditions.push(eq(tabs.category, category))
@@ -32,15 +28,6 @@ export async function GET(request: NextRequest) {
         sql`instr(lower(${urlWithoutScheme}), ${needle}) > 0`,
       )!,
     )
-  }
-
-  if (!paged) {
-    const result = await db
-      .select()
-      .from(tabs)
-      .where(and(...conditions))
-      .orderBy(desc(tabs.lastSeenAt), desc(tabs.id))
-    return NextResponse.json(result)
   }
 
   const cursor = decodeCursor(searchParams.get("cursor"))

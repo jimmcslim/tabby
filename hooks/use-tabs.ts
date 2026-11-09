@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { toast } from "sonner"
 import { useSyncContext } from "@/components/providers/sync-provider"
 import type { ClassifyResponse, Tab } from "@/types"
+import { fetchAllTabs } from "@/lib/tabs/fetch"
 
 export interface UseTabs {
   tabs: Tab[]
@@ -37,10 +38,8 @@ export function useTabs(): UseTabs {
 
   const refresh = useCallback(async () => {
     try {
-      const res = await fetch("/api/tabs?status=open")
-      if (res.ok) setTabs(await res.json())
-    } catch {
-      // ignore
+      const all = await fetchAllTabs("open")
+      if (all) setTabs(all)
     } finally {
       setLoading(false)
     }

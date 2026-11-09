@@ -47,8 +47,8 @@ afterAll(() => {
 
 async function ids(query: string): Promise<string[]> {
   const { NextRequest } = await import("next/server")
-  const res = await GET(new NextRequest(`http://localhost/api/tabs?${query}`))
-  return ((await res.json()) as { id: string }[]).map((t) => t.id).sort()
+  const res = await GET(new NextRequest(`http://localhost/api/tabs?${query}&limit=500`))
+  return ((await res.json()) as { tabs: { id: string }[] }).tabs.map((t) => t.id).sort()
 }
 
 describe("GET /api/tabs ?search=", () => {
@@ -125,10 +125,13 @@ describe("GET /api/tabs paging", () => {
     await db.insert(tabs).values(rows)
   })
 
-  it("returns a bare array when no paging params are given (existing callers)", async () => {
+  it("always returns a page, even with no paging params (default size, first page)", async () => {
     const { NextRequest } = await import("next/server")
     const res = await GET(new NextRequest("http://localhost/api/tabs?status=closed&search=paging.test"))
-    expect(Array.isArray(await res.json())).toBe(true)
+    const body = (await res.json()) as Paged
+    expect(Array.isArray(body)).toBe(false)
+    expect(body.tabs).toHaveLength(7)
+    expect(body.nextCursor).toBeNull()
   })
 
   it("returns a page and a cursor, newest first, then null at the end", async () => {

@@ -2,14 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { Tab } from "@/types"
+import { fetchTabsPage, type TabsPage } from "@/lib/tabs/fetch"
 
 const PAGE_SIZE = 100
 const SEARCH_DEBOUNCE_MS = 200
-
-interface Page {
-  tabs: Tab[]
-  nextCursor: string | null
-}
 
 export interface UseHistoryTabs {
   tabs: Tab[]
@@ -47,17 +43,8 @@ export function useHistoryTabs(search: string): UseHistoryTabs {
   const cursorRef = useRef<string | null>(null)
 
   const fetchPage = useCallback(
-    async (query: string, cursor: string | null): Promise<Page | null> => {
-      const params = new URLSearchParams({ status: "closed", limit: String(PAGE_SIZE) })
-      if (query) params.set("search", query)
-      if (cursor) params.set("cursor", cursor)
-      try {
-        const res = await fetch(`/api/tabs?${params}`)
-        return res.ok ? ((await res.json()) as Page) : null
-      } catch {
-        return null
-      }
-    },
+    (query: string, cursor: string | null): Promise<TabsPage | null> =>
+      fetchTabsPage({ status: "closed", search: query, limit: PAGE_SIZE, cursor }),
     [],
   )
 

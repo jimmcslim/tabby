@@ -32,8 +32,11 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T
 }
 
-const openTabs = () => api<Tab[]>("/api/tabs?status=open")
-const closedTabs = () => api<Tab[]>("/api/tabs?status=closed")
+// GET /api/tabs is always paged; ask for the largest page so tests see everything.
+const tabsWithStatus = (status: string) =>
+  api<{ tabs: Tab[] }>(`/api/tabs?status=${status}&limit=500`).then((r) => r.tabs)
+const openTabs = () => tabsWithStatus("open")
+const closedTabs = () => tabsWithStatus("closed")
 const sessions = () => api<Session[]>("/api/sessions")
 
 async function sessionNamed(name: string): Promise<Session> {
