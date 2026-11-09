@@ -58,14 +58,14 @@ Of 1,061 open tabs: 18 have an extension screenshot file, 628 rely on an OG imag
 2. **Keep OG + extension capture** as the primary pipeline.
 3. **The gap is real (39%), so close it in stages, cheapest first.** Each stage is independently shippable and should be its own `ready-for-agent` issue:
    - **Stage 1: reuse by URL.** In the screenshot route's cache-miss branch, fall back to a capture belonging to another tab row with the same URL (typically the closed duplicate). No new infrastructure. Must be scoped per user once a household tier exists.
-   - **Stage 2: capture backend seam + first backend.** Define a small `captureScreenshot(url)` interface with two interchangeable implementations, both off by default: (a) hosted Firecrawl via API key (least work, best rendering, discloses URLs) and (b) a Playwright (Apache-2.0) Docker sidecar (fully self-hosted). Ship one first; Jim picks (open question below). Needs an SSRF guard (block private ranges, non-http schemes), a per-run cap like `OG_FETCH_LIMIT`, and a timeout. Writes the same `data/screenshots/<tabId>.jpg`, so serving is unchanged. Browserless could implement the same interface later.
+   - **Stage 2: capture backend seam + first backend.** Define a small `captureScreenshot(url)` interface with two interchangeable implementations, both off by default: (a) hosted Firecrawl via API key (least work, best rendering, discloses URLs) and (b) a Playwright (Apache-2.0) Docker sidecar (fully self-hosted). **Decision (Jim, 2026-11-09): build both**, as separate issues: the seam plus hosted Firecrawl first, then the sidecar. Needs an SSRF guard (block private ranges, non-http schemes), a per-run cap like `OG_FETCH_LIMIT`, and a timeout. Writes the same `data/screenshots/<tabId>.jpg`, so serving is unchanged. Browserless could implement the same interface later.
    - **Stage 3: backfill.** A capped, resumable job (or `shot-scraper` CLI) that drains the 415 backlog gradually, using the same backend and guard. Only after Stage 2 is proven on new tabs.
    - **Independent, not blocking:** retention/pruning for the 1.1 GB cache; per-user screenshot paths for the household tier (do the path change before Stage 2 if the tier is near).
 4. **Sequencing:** 1 first (small win now); 2 and 3 only if Stage 1 leaves a gap Jim still cares about. Server-side capture cannot see logged-in pages, so some tabs will remain preview-less by design.
 
 ## Open questions
 
-- **Hosted vs sidecar first?** Hosted Firecrawl is less work and cheaper to run but discloses tab URLs; the sidecar is private but heavier. Verify the screenshot credit cost with one call before deciding.
+- ~~Hosted vs sidecar first?~~ Decided: build both (seam + hosted Firecrawl, then sidecar). Still verify the screenshot credit cost with one real call during the hosted issue.
 - Is the remaining gap after Stage 1 worth running a headless browser for? (Re-measure after Stage 1.)
 - Should the 1.1 GB screenshot cache get pruning/retention (closed tabs are 96% of rows)? Independent of this decision.
 - Is any hosted/multi-tenant deployment contemplated? That is what would make AGPL/SSPL matter.
