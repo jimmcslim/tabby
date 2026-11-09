@@ -240,9 +240,24 @@ Import validates: version 1, non-empty name, non-empty tabs, valid URLs (blocks 
 | `OLLAMA_MODEL` | `qwen3.5:latest` | Model for AI features |
 | `TABBY_DISABLE_ENRICHMENT` | unset | Set to `1` to suppress the background work a sync kicks off — OG image fetches, tweet lookups, and the Ollama classify/summarize pass. Tab, session and group writes are unaffected. Used by the end-to-end tests so they run offline and deterministically. |
 | `FIRECRAWL_API_KEY` | unset | Opt-in server-side screenshots via hosted Firecrawl for tabs with no extension capture and no OG image. **Sends those tabs' URLs to Firecrawl** and spends credits (4xx pages get one extra attempt at the domain root). Off when unset or when `TABBY_DISABLE_ENRICHMENT` is set. |
-| `CAPTURE_DRAIN_LIMIT` | `15` | Max Firecrawl calls per background capture drain. |
+| `CAPTURE_BACKEND` | inferred | `hosted`, `sidecar` or `none`. Unset: `hosted` when `FIRECRAWL_API_KEY` is set, otherwise `none`. `sidecar` uses the self-hosted Playwright service below. |
+| `CAPTURE_SIDECAR_URL` | `http://capture-sidecar:3002` | Where Tabby reaches the Playwright sidecar (only read when `CAPTURE_BACKEND=sidecar`). |
+| `CAPTURE_DRAIN_LIMIT` | `15` | Max backend calls per background capture drain (either backend). |
 | `CAPTURE_DENYLIST` | unset | Comma-separated domains (subdomains included) never sent for capture, added to built-in banking/mail defaults. Private/internal hosts and non-http(s) URLs are always refused. |
 | `NEXT_DIST_DIR` | `.next` | Next.js build directory. The test harness sets `.next-test` so a second dev server doesn't collide with your own. |
+
+## Self-hosted screenshot capture (Playwright sidecar)
+
+An alternative to hosted Firecrawl that keeps URLs on your machine. It is a small Node service in `sidecar/` that drives headless Chromium via [Playwright](https://playwright.dev) (Apache-2.0). Off by default.
+
+```bash
+CAPTURE_BACKEND=sidecar docker compose --profile capture up -d --build
+```
+
+- **Same rules as hosted**: URLs pass the shared guards before capture (http(s) only, private/internal addresses refused, `CAPTURE_DENYLIST`, per-drain cap `CAPTURE_DRAIN_LIMIT`, failed pages remembered). Inside the browser, every request, including redirects and subresources, is re-checked and aborted if it points at a private address. Output is the same `data/screenshots/<tabId>.jpg`.
+- **Resource footprint**: the image is ~2 GB (Playwright base image with browsers). Chromium is launched per capture and closed straight after (context and browser are closed on success, failure and timeout), so idle cost is a ~50 MB Node process; during a capture expect roughly 300-600 MB RAM and one CPU core for a few seconds. Captures run one at a time, with a 45 s hard deadline each. The compose service is capped at `mem_limit: 1g` and uses `ipc: host` and `init: true` as Playwright recommends.
+- **Isolation**: no published port (only Tabby can reach it on the compose network), unprivileged user, all capabilities dropped, `no-new-privileges`. Chromium's own sandbox stays on: the service runs with Playwright's seccomp profile, `sidecar/seccomp_profile.json` (Docker's default profile plus the `clone`/`setns`/`unshare` rules Chromium needs; copied unmodified from [microsoft/playwright](https://github.com/microsoft/playwright/blob/v1.58.2/utils/docker/seccomp_profile.json) tag `v1.58.2`, Apache-2.0, see the [Playwright Docker docs](https://playwright.dev/docs/docker)). To refresh it after bumping `PLAYWRIGHT_VERSION` in `sidecar/Dockerfile`: `gh api -H "Accept: application/vnd.github.raw" "repos/microsoft/playwright/contents/utils/docker/seccomp_profile.json?ref=v<version>" > sidecar/seccomp_profile.json`.
+- **Limit**: DNS is resolved once by the guard and again by the browser, so a hostile DNS server could in theory rebind between the two. Do not point this at untrusted multi-user input.
 
 ## Keyboard Shortcuts
 

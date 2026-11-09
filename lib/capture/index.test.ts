@@ -14,6 +14,22 @@ describe("resolveCaptureBackend", () => {
   })
 })
 
+describe("resolveCaptureBackend selection by CAPTURE_BACKEND", () => {
+  it("selects the sidecar (default or custom URL) only when asked", () => {
+    expect(resolveCaptureBackend({ CAPTURE_BACKEND: "sidecar" })?.name).toBe("playwright-sidecar")
+    expect(resolveCaptureBackend({ CAPTURE_BACKEND: "sidecar", CAPTURE_SIDECAR_URL: "http://x:1" })?.name).toBe("playwright-sidecar")
+  })
+  it("explicit hosted needs a key; explicit none wins over a key", () => {
+    expect(resolveCaptureBackend({ CAPTURE_BACKEND: "hosted" })).toBeNull()
+    expect(resolveCaptureBackend({ CAPTURE_BACKEND: "hosted", FIRECRAWL_API_KEY: "fc-1" })?.name).toBe("firecrawl")
+    expect(resolveCaptureBackend({ CAPTURE_BACKEND: "none", FIRECRAWL_API_KEY: "fc-1" })).toBeNull()
+  })
+  it("sidecar is suppressed when enrichment is disabled; unknown values are off", () => {
+    expect(resolveCaptureBackend({ CAPTURE_BACKEND: "sidecar", TABBY_DISABLE_ENRICHMENT: "1" })).toBeNull()
+    expect(resolveCaptureBackend({ CAPTURE_BACKEND: "bogus", FIRECRAWL_API_KEY: "fc-1" })).toBeNull()
+  })
+})
+
 describe("resolveDrainLimit", () => {
   it("defaults to 15 and accepts CAPTURE_DRAIN_LIMIT", () => {
     expect(resolveDrainLimit({})).toBe(15)

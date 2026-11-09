@@ -8,6 +8,10 @@ services:
     environment:
       - DATABASE_PATH=/app/data/tabby.db
       - OLLAMA_URL=http://host.docker.internal:11434
+      # Server-side screenshots (all off by default): hosted | sidecar | none.
+      # For the sidecar also run: docker compose --profile capture up -d
+      - CAPTURE_BACKEND=${CAPTURE_BACKEND:-}
+      - FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY:-}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
@@ -27,6 +31,23 @@ services:
           path: bun.lock
         - action: rebuild
           path: next.config.mjs
+
+  # Self-hosted Playwright capture backend. Off unless the "capture" profile is enabled.
+  capture-sidecar:
+    profiles: ["capture"]
+    build:
+      context: .
+      dockerfile: sidecar/Dockerfile
+    init: true # reap Chromium zombies
+    ipc: host # Chromium crashes out of memory on the default /dev/shm
+    mem_limit: 1g
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+      # Playwright's profile (default Docker profile + user namespaces) so Chromium's sandbox works.
+      - seccomp=./sidecar/seccomp_profile.json
+    # No `ports:` on purpose: only the tabby service can reach it, over the compose network.
+    restart: unless-stopped
 
 volumes:
   tabby-data:
