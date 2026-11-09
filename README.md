@@ -134,7 +134,7 @@ AI capabilities:
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/tabs` | List tabs (filter: `status`, `category`, `search`) |
+| GET | `/api/tabs` | List tabs (filter: `status`, `category`, `search` — title or URL). Add `limit` and/or `cursor` for keyset paging: returns `{ tabs, nextCursor }` (default 100, max 500) instead of a bare array; History uses this |
 | PATCH | `/api/tabs/[tabId]` | Update tab metadata |
 | DELETE | `/api/tabs/[tabId]` | Delete tab from database |
 | POST | `/api/tabs/sync` | Trigger Chrome sync |
