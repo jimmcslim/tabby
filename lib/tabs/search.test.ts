@@ -1,13 +1,13 @@
 import { describe, expect, it } from "bun:test"
 import type { Tab } from "@/types"
 import type { TabGroup } from "./grouping"
-import { filterGroups, filterTabsByTitle } from "./search"
+import { filterGroups, filterTabs, stripScheme } from "./search"
 
-function makeTab(id: string, title: string | null): Tab {
+function makeTab(id: string, title: string | null, url = `https://example.com/${id}`): Tab {
   return {
     id,
     chromeId: null,
-    url: `https://example.com/${id}`,
+    url,
     title,
     domain: null,
     faviconUrl: null,
@@ -35,33 +35,73 @@ const tabs = [
   makeTab("d", "agile retrospective"),
 ]
 
-describe("filterTabsByTitle", () => {
+describe("filterTabs", () => {
   it("returns the same array for an empty query", () => {
-    expect(filterTabsByTitle(tabs, "")).toBe(tabs)
+    expect(filterTabs(tabs, "")).toBe(tabs)
   })
 
   it("matches case-insensitively anywhere in the title", () => {
-    expect(filterTabsByTitle(tabs, "AGILE").map((t) => t.id)).toEqual(["a", "d"])
-    expect(filterTabsByTitle(tabs, "release").map((t) => t.id)).toEqual(["b"])
+    expect(filterTabs(tabs, "AGILE").map((t) => t.id)).toEqual(["a", "d"])
+    expect(filterTabs(tabs, "release").map((t) => t.id)).toEqual(["b"])
   })
 
-  it("never matches a tab with no title", () => {
-    expect(filterTabsByTitle(tabs, "e").some((t) => t.id === "c")).toBe(false)
+  it("a tab with no title can't match on title text", () => {
+    expect(filterTabs(tabs, "agile").some((t) => t.id === "c")).toBe(false)
   })
 
   it("returns an empty list when nothing matches", () => {
-    expect(filterTabsByTitle(tabs, "zzz")).toEqual([])
+    expect(filterTabs(tabs, "zzz")).toEqual([])
   })
 
   it("keeps tab object identity so memoised cards don't re-render", () => {
-    expect(filterTabsByTitle(tabs, "bun")[0]).toBe(tabs[1])
+    expect(filterTabs(tabs, "bun")[0]).toBe(tabs[1])
   })
 
   it("treats regex and SQL wildcard characters literally", () => {
     const special = [makeTab("x", "100% sure (really)"), makeTab("y", "plain")]
-    expect(filterTabsByTitle(special, "(really)").map((t) => t.id)).toEqual(["x"])
-    expect(filterTabsByTitle(special, "%").map((t) => t.id)).toEqual(["x"])
-    expect(filterTabsByTitle(special, ".*")).toEqual([])
+    expect(filterTabs(special, "(really)").map((t) => t.id)).toEqual(["x"])
+    expect(filterTabs(special, "%").map((t) => t.id)).toEqual(["x"])
+    expect(filterTabs(special, ".*")).toEqual([])
+  })
+})
+
+describe("filterTabs by URL", () => {
+  const hn = makeTab("h", "Hacker News", "https://news.ycombinator.com/item?id=1")
+  const other = makeTab("o", "Something else", "http://example.org/path")
+  const all = [hn, other]
+
+  it("matches the domain even when the title doesn't contain the text", () => {
+    expect(filterTabs(all, "news.").map((t) => t.id)).toEqual(["h"])
+    expect(filterTabs(all, "news.ycombinator").map((t) => t.id)).toEqual(["h"])
+    expect(filterTabs(all, "YCOMBINATOR.com").map((t) => t.id)).toEqual(["h"])
+  })
+
+  it("still matches on title alone", () => {
+    expect(filterTabs(all, "hacker").map((t) => t.id)).toEqual(["h"])
+  })
+
+  it("matches path and query text in the URL", () => {
+    expect(filterTabs(all, "item?id=1").map((t) => t.id)).toEqual(["h"])
+    expect(filterTabs(all, "/path").map((t) => t.id)).toEqual(["o"])
+  })
+
+  it("does not match every tab on the scheme", () => {
+    expect(filterTabs(all, "http")).toEqual([])
+    expect(filterTabs(all, "https://")).toEqual([])
+  })
+
+  it("matches a tab with no title by URL", () => {
+    const untitled = makeTab("u", null, "https://docs.bun.sh/")
+    expect(filterTabs([untitled], "docs.bun").map((t) => t.id)).toEqual(["u"])
+  })
+})
+
+describe("stripScheme", () => {
+  it("removes only a leading http(s):// ", () => {
+    expect(stripScheme("https://a.com/")).toBe("a.com/")
+    expect(stripScheme("HTTP://a.com/")).toBe("a.com/")
+    expect(stripScheme("chrome://extensions")).toBe("chrome://extensions")
+    expect(stripScheme("https://a.com/?u=https://b.com")).toBe("a.com/?u=https://b.com")
   })
 })
 

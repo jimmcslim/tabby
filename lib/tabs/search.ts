@@ -1,18 +1,29 @@
 import type { Tab } from "@/types"
 import type { TabGroup } from "./grouping"
 
+/** A URL without its leading `http://` / `https://`, so a query like "http" doesn't match every tab. */
+export function stripScheme(url: string): string {
+  return url.replace(/^https?:\/\//i, "")
+}
+
 /**
- * Tabs whose title contains `query`, case-insensitively. An empty query keeps
- * everything; a tab with no title never matches a non-empty query. Mirrors the
- * title `LIKE %query%` filter `GET /api/tabs?search=` applies, so filtering the
- * already-loaded tabs in the browser shows the same results without a round
- * trip per keystroke. Returns `tabs` itself (same reference) when nothing is
- * filtered, so memoised consumers don't re-render.
+ * Tabs whose title or URL contains `query`, case-insensitively and literally
+ * (no wildcards). Matching the URL lets "news.ycombinator" find a tab titled
+ * "Hacker News"; the scheme is stripped first so "https" doesn't match
+ * everything. An empty query keeps everything; a missing title simply can't
+ * match. `GET /api/tabs?search=` applies the same rule in SQL, so the Dashboard
+ * (filtering the already-loaded tabs in the browser, no round trip per
+ * keystroke) and History agree. Returns `tabs` itself (same reference) when
+ * nothing is filtered, so memoised consumers don't re-render.
  */
-export function filterTabsByTitle(tabs: Tab[], query: string): Tab[] {
+export function filterTabs(tabs: Tab[], query: string): Tab[] {
   if (!query) return tabs
   const needle = query.toLowerCase()
-  return tabs.filter((t) => t.title?.toLowerCase().includes(needle) ?? false)
+  return tabs.filter(
+    (t) =>
+      (t.title?.toLowerCase().includes(needle) ?? false) ||
+      stripScheme(t.url).toLowerCase().includes(needle),
+  )
 }
 
 /**
@@ -24,6 +35,6 @@ export function filterTabsByTitle(tabs: Tab[], query: string): Tab[] {
 export function filterGroups(groups: TabGroup[], query: string): TabGroup[] {
   if (!query) return groups
   return groups
-    .map((g) => ({ ...g, tabs: filterTabsByTitle(g.tabs, query) }))
+    .map((g) => ({ ...g, tabs: filterTabs(g.tabs, query) }))
     .filter((g) => g.tabs.length > 0)
 }
