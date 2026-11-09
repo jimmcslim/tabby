@@ -1,10 +1,11 @@
 "use client"
 
+import { useRef } from "react"
 import { useSyncContext } from "@/components/providers/sync-provider"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { Search01Icon, ArrowReloadHorizontalIcon } from "@hugeicons/core-free-icons"
+import { Search01Icon, ArrowReloadHorizontalIcon, Cancel01Icon } from "@hugeicons/core-free-icons"
 import { cn } from "@/lib/utils"
 
 interface HeaderProps {
@@ -24,6 +25,12 @@ function timeAgo(date: Date): string {
 
 export function Header({ title, searchValue, onSearchChange, children }: HeaderProps) {
   const { lastSync, isSyncing, triggerSync, chromeStatus } = useSyncContext()
+  const searchRef = useRef<HTMLInputElement>(null)
+  const hasSearchText = searchValue.trim() !== ""
+  const clearSearch = () => {
+    onSearchChange("")
+    searchRef.current?.focus()
+  }
   const restoreProgress = chromeStatus?.restoring ? chromeStatus.restoreProgress : undefined
 
   return (
@@ -77,11 +84,31 @@ export function Header({ title, searchValue, onSearchChange, children }: HeaderP
             className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
           />
           <Input
+            ref={searchRef}
             placeholder="Search tabs..."
-            className="w-64 pl-9"
+            className="w-64 pl-9 pr-9"
             value={searchValue}
             onChange={(e) => onSearchChange(e.target.value)}
+            onKeyDown={(e) => {
+              // Escape clears a non-empty search; on an empty field it keeps its
+              // default behaviour (e.g. closing an open popup) untouched.
+              if (e.key === "Escape" && hasSearchText) {
+                e.preventDefault()
+                clearSearch()
+              }
+            }}
           />
+          {hasSearchText && (
+            <button
+              type="button"
+              className="absolute right-2 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              title="Clear search"
+              aria-label="Clear search"
+              onClick={clearSearch}
+            >
+              <HugeiconsIcon icon={Cancel01Icon} className="size-3.5" />
+            </button>
+          )}
         </div>
         {children}
       </div>
