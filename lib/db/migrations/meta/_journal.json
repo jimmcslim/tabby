@@ -8,6 +8,13 @@
       "when": 1786948612513,
       "tag": "0000_nostalgic_cable",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1794208392011,
+      "tag": "0001_capture_failure_memo",
+      "breakpoints": true
     }
   ]
 }

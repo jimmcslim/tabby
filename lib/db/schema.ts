@@ -14,6 +14,10 @@ export const tabs = sqliteTable(
     category: text("category"),
     summary: text("summary"),
     ogImage: text("og_image"),
+    // Failure memo for server-side screenshot capture (lib/capture): when set,
+    // the tab is never re-requested, because a failed capture still costs a credit.
+    captureFailedAt: text("capture_failed_at"),
+    captureFailReason: text("capture_fail_reason"),
     description: text("description"),
     windowId: integer("window_id"),
     tabIndex: integer("tab_index"),

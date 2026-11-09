@@ -1,3 +1,4 @@
+import { enqueueCapture } from "@/lib/capture"
 import { getDb } from "@/lib/db"
 import { tabs } from "@/lib/db/schema"
 import { ensureScreenshotDir, screenshotPath } from "@/lib/screenshots"
@@ -17,8 +18,8 @@ function jpegResponse(data: Buffer | Uint8Array, maxAge: number) {
 /**
  * Serves the cached tab preview. Captures arrive from the extension
  * (POST /api/extension/screenshot) whenever a tab is activated; this route
- * never captures. A future on-demand capture backend (Firecrawl / Playwright)
- * would slot in here where the cache misses.
+ * never captures inline: on a total miss it only enqueues the tab for the
+ * background capture drain (lib/capture).
  */
 export async function GET(
   request: NextRequest,
@@ -39,6 +40,10 @@ export async function GET(
   if (tab?.ogImage) {
     return NextResponse.redirect(tab.ogImage, { status: 302 })
   }
+
+  // Nothing to show: queue a background server-side capture (no-op unless a
+  // capture backend is configured). The next request finds the file.
+  if (tab) enqueueCapture(tab.id)
 
   return NextResponse.json({ error: "No screenshot available" }, { status: 404 })
 }
