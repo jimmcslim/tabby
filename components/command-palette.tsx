@@ -28,6 +28,10 @@ import {
   ArrowReloadHorizontalIcon,
 } from "@hugeicons/core-free-icons"
 import { toast } from "sonner"
+import { fetchAllTabs, fetchTabsPage } from "@/lib/tabs/fetch"
+
+/** How many of the most recent closed tabs the palette offers to reopen. */
+const CLOSED_TABS_LIMIT = 200
 
 export function CommandPalette() {
   const [open, setOpen] = useState(false)
@@ -66,8 +70,10 @@ export function CommandPalette() {
   useEffect(() => {
     if (!open) return
     Promise.all([
-      fetch("/api/tabs?status=open").then((r) => r.json()).catch(() => []),
-      fetch("/api/tabs?status=closed").then((r) => r.json()).catch(() => []),
+      fetchAllTabs("open").then((t) => t ?? []),
+      // Closed history is unbounded (tens of thousands of rows): just the most
+      // recent page. The History page searches the rest.
+      fetchTabsPage({ status: "closed", limit: CLOSED_TABS_LIMIT }).then((p) => p?.tabs ?? []),
       fetch("/api/sessions").then((r) => r.json()).catch(() => []),
       fetch("/api/groups").then((r) => r.json()).catch(() => []),
     ]).then(([openTabs, closed, sess, grps]) => {

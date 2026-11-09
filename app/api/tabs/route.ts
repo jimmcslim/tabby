@@ -1,7 +1,8 @@
 import { getDb } from "@/lib/db"
 import { tabs } from "@/lib/db/schema"
-import { eq, and, or, desc, sql } from "drizzle-orm"
+import { eq, and, or, desc, lt, sql } from "drizzle-orm"
 import { NextRequest, NextResponse } from "next/server"
+import { decodeCursor, encodeCursor, parsePageSize } from "@/lib/tabs/paging"
 
 export async function GET(request: NextRequest) {
   const db = await getDb()
@@ -29,11 +30,32 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  const result = await db
+  const cursor = decodeCursor(searchParams.get("cursor"))
+  if (searchParams.get("cursor") && !cursor) {
+    return NextResponse.json({ error: "Invalid cursor" }, { status: 400 })
+  }
+  if (cursor) {
+    // Keyset: strictly after the cursor row in (lastSeenAt DESC, id DESC) order.
+    conditions.push(
+      or(
+        lt(tabs.lastSeenAt, cursor.lastSeenAt),
+        and(eq(tabs.lastSeenAt, cursor.lastSeenAt), lt(tabs.id, cursor.id)),
+      )!,
+    )
+  }
+
+  const limit = parsePageSize(searchParams.get("limit"))
+  // One extra row tells us whether another page exists.
+  const rows = await db
     .select()
     .from(tabs)
     .where(and(...conditions))
-    .orderBy(desc(tabs.lastSeenAt))
+    .orderBy(desc(tabs.lastSeenAt), desc(tabs.id))
+    .limit(limit + 1)
 
-  return NextResponse.json(result)
+  const page = rows.slice(0, limit)
+  const last = page[page.length - 1]
+  const nextCursor =
+    rows.length > limit && last ? encodeCursor({ lastSeenAt: last.lastSeenAt, id: last.id }) : null
+  return NextResponse.json({ tabs: page, nextCursor })
 }

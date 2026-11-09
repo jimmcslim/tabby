@@ -1,7 +1,9 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useRef, useState } from "react"
 import type { Tab } from "@/types"
+import { useHistoryTabs } from "@/hooks/use-history-tabs"
+import { LoadMoreSentinel } from "@/components/shared/load-more-sentinel"
 import { Header } from "@/components/layout/header"
 import { TabGrid } from "@/components/tabs/tab-grid"
 import { TabDetailSheet } from "@/components/tabs/tab-detail-sheet"
@@ -9,28 +11,11 @@ import { EmptyState } from "@/components/shared/empty-state"
 import { toast } from "sonner"
 
 export default function HistoryPage() {
-  const [tabs, setTabs] = useState<Tab[]>([])
   const [search, setSearch] = useState("")
+  const { tabs, loading, loadingMore, hasMore, loadMore, remove, replace } = useHistoryTabs(search)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [detailTab, setDetailTab] = useState<Tab | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  const fetchTabs = useCallback(async () => {
-    try {
-      const params = new URLSearchParams({ status: "closed" })
-      if (search) params.set("search", search)
-      const res = await fetch(`/api/tabs?${params}`)
-      if (res.ok) setTabs(await res.json())
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false)
-    }
-  }, [search])
-
-  useEffect(() => {
-    fetchTabs()
-  }, [fetchTabs])
+  const scrollRef = useRef<HTMLDivElement>(null)
 
   const handleSelect = useCallback((id: string, selected: boolean) => {
     setSelectedIds((prev) => {
@@ -53,7 +38,7 @@ export default function HistoryPage() {
         })
         if (res.ok) {
           toast.success(`Reopened "${tab.title || tab.url}"`)
-          setTabs((prev) => prev.filter((t) => t.id !== tabId))
+          remove(tabId)
         } else {
           toast.error("Failed to reopen tab")
         }
@@ -61,14 +46,14 @@ export default function HistoryPage() {
         toast.error("Failed to reopen tab")
       }
     },
-    [tabs],
+    [tabs, remove],
   )
 
   return (
     <>
       <Header title="History" searchValue={search} onSearchChange={setSearch} />
 
-      <div className="flex-1 overflow-y-auto p-8">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-8">
         {loading ? (
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
             {Array.from({ length: 8 }).map((_, i) => (
@@ -98,6 +83,21 @@ export default function HistoryPage() {
             onReopen={handleReopen}
           />
         )}
+
+        {!loading && tabs.length > 0 && (
+          <>
+            <LoadMoreSentinel
+              root={scrollRef}
+              hasMore={hasMore}
+              loading={loadingMore}
+              onLoadMore={loadMore}
+              itemCount={tabs.length}
+            />
+            <p className="py-6 text-center text-xs text-muted-foreground">
+              {loadingMore ? "Loading more…" : hasMore ? "" : "End of history"}
+            </p>
+          </>
+        )}
       </div>
 
       <TabDetailSheet
@@ -106,7 +106,7 @@ export default function HistoryPage() {
         onOpenChange={(open) => !open && setDetailTab(null)}
         onFocus={handleReopen}
         onClose={() => {}}
-        onTabUpdated={(t) => { setDetailTab(t); setTabs((prev) => prev.map((x) => x.id === t.id ? t : x)) }}
+        onTabUpdated={(t) => { setDetailTab(t); replace(t) }}
       />
     </>
   )
