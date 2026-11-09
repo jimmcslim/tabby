@@ -19,12 +19,12 @@ const PORT = Number.parseInt(process.env.PORT ?? "3002", 10)
 const MAX_BODY = 8 * 1024
 
 async function launch(): Promise<BrowserLike> {
-  // --no-sandbox: Docker's default seccomp profile blocks Chromium's user-namespace sandbox;
-  // isolation comes from the container instead (unprivileged user, cap_drop ALL, no published port).
+  // Chromium's sandbox stays ON: docker-compose.yml runs this container with Playwright's
+  // seccomp profile (sidecar/seccomp_profile.json), which permits the user namespaces it needs.
   // Variable specifier keeps this out of the app's typecheck and the bundle.
   const mod = "playwright-core"
   const { chromium } = (await import(mod)) as { chromium: { launch(o: object): Promise<BrowserLike> } }
-  return chromium.launch({ headless: true, args: ["--disable-dev-shm-usage", "--no-sandbox"] })
+  return chromium.launch({ headless: true, args: ["--disable-dev-shm-usage"] })
 }
 
 let tail: Promise<unknown> = Promise.resolve()

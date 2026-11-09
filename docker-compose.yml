@@ -42,7 +42,10 @@ services:
     ipc: host # Chromium crashes out of memory on the default /dev/shm
     mem_limit: 1g
     cap_drop: [ALL]
-    security_opt: ["no-new-privileges:true"]
+    security_opt:
+      - no-new-privileges:true
+      # Playwright's profile (default Docker profile + user namespaces) so Chromium's sandbox works.
+      - seccomp=./sidecar/seccomp_profile.json
     # No `ports:` on purpose: only the tabby service can reach it, over the compose network.
     restart: unless-stopped
 

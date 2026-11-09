@@ -15,7 +15,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 RUN npm install --no-save --no-audit --no-fund playwright-core@${PLAYWRIGHT_VERSION}
 COPY --from=build /out/server.mjs ./server.mjs
-# Unprivileged user; Chromium runs with --no-sandbox, so isolation is the container (see docker-compose.yml).
+# Unprivileged user; Chromium's sandbox stays on; it needs the seccomp profile set in docker-compose.yml.
 USER pwuser
 EXPOSE 3002
 CMD ["node", "server.mjs"]
