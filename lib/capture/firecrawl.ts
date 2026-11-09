@@ -1,4 +1,4 @@
-import { FirecrawlClient, SdkError } from "@mendable/firecrawl-js"
+import { FirecrawlClient, SdkError } from "firecrawl"
 import type { CaptureBackend, CaptureResult } from "./types"
 
 /**
@@ -9,7 +9,7 @@ import type { CaptureBackend, CaptureResult } from "./types"
  * including pages that turn out to be 403/404.
  *
  * BILLING SAFETY: the SDK retries on its own by default, which would spend
- * credits behind drain.ts's back. Verified against @mendable/firecrawl-js
+ * credits behind drain.ts's back. Verified against firecrawl
  * 4.52.0 (src/v2/utils/httpClient.ts, src/v2/methods/scrape.ts):
  *  - HttpClient re-sends the request on HTTP 502, up to `maxRetries` (default 3)
  *    attempts total. `maxRetries: 1` means a single attempt (0 would make the

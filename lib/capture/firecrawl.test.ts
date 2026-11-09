@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test"
-import { SdkError } from "@mendable/firecrawl-js"
+import { SdkError } from "firecrawl"
 import { createFirecrawlBackend } from "./firecrawl"
 
 const IMG = new Uint8Array([1, 2, 3, 4])
