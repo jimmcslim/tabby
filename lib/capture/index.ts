@@ -38,7 +38,7 @@ export function resolveDrainLimit(env: NodeJS.ProcessEnv = process.env): number 
   return Number.isFinite(n) && n > 0 ? n : DEFAULT_DRAIN_LIMIT
 }
 
-const dbStore: DrainStore = {
+export const dbStore: DrainStore = {
   async getTab(id) {
     const db = await getDb()
     const [row] = await db
