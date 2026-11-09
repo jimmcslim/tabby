@@ -5,7 +5,7 @@ import type { Tab } from "@/types"
 import { useSyncContext } from "@/components/providers/sync-provider"
 import { useTabs } from "@/hooks/use-tabs"
 import { toast } from "sonner"
-import { filterGroups, filterTabsByTitle } from "@/lib/tabs/search"
+import { filterGroups, filterTabs } from "@/lib/tabs/search"
 import { bulkCloseNeedsConfirm } from "@/lib/tabs/selection"
 import { useTabGroups, useTabViewPrefs } from "@/hooks/use-tab-view-prefs"
 import { useTabSelection } from "@/hooks/use-tab-selection"
@@ -39,7 +39,7 @@ export default function DashboardPage() {
   // Filter the loaded tabs in the browser. The deferred value lets React keep
   // the input responsive and render the (large) filtered grid at lower priority.
   const deferredSearch = useDeferredValue(prefs.search)
-  const visibleTabs = useMemo(() => filterTabsByTitle(tabs, deferredSearch), [tabs, deferredSearch])
+  const visibleTabs = useMemo(() => filterTabs(tabs, deferredSearch), [tabs, deferredSearch])
   const selection = useTabSelection()
   const { deselect, clear: clearSelection } = selection
   const classify = useClassify(visibleTabs, applyClassifications)

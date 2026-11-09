@@ -71,7 +71,7 @@ sequenceDiagram
     Note over UI,API: Tab cards lazy-load previews via<br/>GET /api/tabs/[tabId]/screenshot
 ```
 
-Searching, grouping and sorting all happen client-side: the page loads every open tab once per sync and filters by title in the browser ([`lib/tabs/search.ts`](../lib/tabs/search.ts)), so typing in the search box costs no requests. (`GET /api/tabs` still accepts a `search` parameter — a SQL `LIKE` on tab titles — but the Dashboard no longer uses it.)
+Searching, grouping and sorting all happen client-side: the page loads every open tab once per sync and filters by title or URL in the browser ([`lib/tabs/search.ts`](../lib/tabs/search.ts)), so typing in the search box costs no requests. (`GET /api/tabs` still accepts a `search` parameter — a title-or-URL match done in SQL, kept identical to the browser filter — which the History page uses.)
 
 ## Flow 3: Closing a tab from the UI
 

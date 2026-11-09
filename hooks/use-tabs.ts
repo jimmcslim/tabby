@@ -26,7 +26,7 @@ export interface UseTabs {
 /**
  * The dashboard's data layer: every open tab, their window names, and every
  * mutation that changes them. Refetches whenever a sync lands. Searching is
- * not done here — filter the result in the browser (see `filterTabsByTitle`),
+ * not done here — filter the result in the browser (see `filterTabs`),
  * so typing never costs a request.
  */
 export function useTabs(): UseTabs {
