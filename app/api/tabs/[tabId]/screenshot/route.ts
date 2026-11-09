@@ -1,7 +1,7 @@
 import { getDb } from "@/lib/db"
 import { tabs } from "@/lib/db/schema"
 import { ensureScreenshotDir, screenshotPath } from "@/lib/screenshots"
-import { eq } from "drizzle-orm"
+import { and, desc, eq, ne } from "drizzle-orm"
 import { NextRequest, NextResponse } from "next/server"
 import fs from "node:fs"
 
@@ -33,9 +33,29 @@ export async function GET(
     return jpegResponse(fs.readFileSync(filePath), 300)
   }
 
-  // No capture yet — fall back to the OG image if the tab has one
   const db = await getDb()
   const [tab] = await db.select().from(tabs).where(eq(tabs.id, tabId)).limit(1)
+
+  // No capture of its own — reuse the newest capture of another tab row with
+  // the same URL (typically a closed duplicate that was viewed).
+  // SEAM: this lookup is global today. When a per-user tier exists, add the
+  // owner condition here (and to screenshotPath) so one user's capture can
+  // never be served to another.
+  if (tab) {
+    const duplicates = await db
+      .select({ id: tabs.id })
+      .from(tabs)
+      .where(and(eq(tabs.url, tab.url), ne(tabs.id, tabId)))
+      .orderBy(desc(tabs.updatedAt))
+    for (const dup of duplicates) {
+      const dupPath = screenshotPath(dup.id)
+      if (fs.existsSync(dupPath)) {
+        return jpegResponse(fs.readFileSync(dupPath), 300)
+      }
+    }
+  }
+
+  // Still nothing — fall back to the OG image if the tab has one
   if (tab?.ogImage) {
     return NextResponse.redirect(tab.ogImage, { status: 302 })
   }

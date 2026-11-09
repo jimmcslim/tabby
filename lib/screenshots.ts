@@ -1,7 +1,8 @@
 import fs from "node:fs"
 import path from "node:path"
 
-const SCREENSHOT_DIR = path.join(process.cwd(), "data", "screenshots")
+// SCREENSHOT_DIR lets tests point at a scratch directory.
+const SCREENSHOT_DIR = process.env.SCREENSHOT_DIR || path.join(process.cwd(), "data", "screenshots")
 
 export function ensureScreenshotDir(): void {
   if (!fs.existsSync(SCREENSHOT_DIR)) {
