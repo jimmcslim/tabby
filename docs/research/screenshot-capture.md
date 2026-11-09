@@ -35,6 +35,15 @@ Research for wayfinder ticket #4 (map #1). Researched 2026-11-09. Research only;
 | Gotenberg | MIT | HTML/URL to PDF; screenshot routes exist but its focus is PDF | Heavier than needed |
 | Hosted screenshot APIs (Firecrawl cloud, Browserless cloud, etc.) | commercial | Yes | Allowed by the map only as optional; leaks the user's tab URLs (browsing history) to a third party, which is a privacy cost for a tab manager |
 
+## Hosted Firecrawl (reviewer question: "what if we just use the hosted service?")
+
+Reconsidered after review. The map allows managed cloud "where genuinely easier, never required", so hosted Firecrawl is a legitimate optional backend, not something to dismiss with the self-host findings.
+
+- **Cost is trivial at this scale.** Per docs.firecrawl.dev/billing and firecrawl.dev/pricing (effective 2026-09-04): 1 credit per basic scrape; the surcharge list (+4) covers JSON, Question and Highlight formats only, and a screenshot surcharge is **not listed** (verify with one real call before relying on it). Free tier: 1,000 credits/month, no card. Hobby: $16-19/month for 5,000. The 415-tab backlog fits inside one free month if screenshots cost 1 credit; ongoing new-tab volume is the only unmeasured input.
+- **Works where self-host does not.** Screenshots are a cloud (Fire-engine) feature, so the hosted API is the one Firecrawl route that actually produces them, with JS rendering, proxies and anti-bot handling a plain Playwright sidecar lacks.
+- **Costs that remain:** every URL sent is disclosed to a third party; it sees only public pages (same limit as any server-side capture); returned screenshot URLs expire after ~24h so we must download and store immediately (fits the existing `data/screenshots/<tabId>.jpg` model); an API key and an outbound dependency are introduced; failed pages (403/404) still cost 1 credit.
+- **Mitigations if adopted:** opt-in via env var (`FIRECRAWL_API_KEY`), off by default; send only URLs of tabs that have no capture and no OG image; skip private/internal hosts, `file:`, and a user-configurable domain denylist (banking, mail, intranet); per-run cap like `OG_FETCH_LIMIT`; never re-request a URL already captured.
+
 ## Privacy and household notes
 
 Any server-side capture fetches URLs from the server's network position, unauthenticated: it cannot see logged-in pages, and it exposes every tab URL to whatever runs it (a cloud API sees full browsing history). It also creates SSRF risk (private/internal URLs, `file:`), which the current OG fetch already has to some degree. Extension capture stays inside the user's own browser session and is the better default for a household tier (each member's own extension feeds their own previews). Storage today is a flat directory keyed by tab id with no per-user partitioning; a household tier would need per-user keys or paths regardless of capture method.
@@ -45,17 +54,18 @@ Of 1,061 open tabs: 18 have an extension screenshot file, 628 rely on an OG imag
 
 ## Recommendation
 
-1. **Drop Firecrawl** as a preview backend: self-hosted screenshots are not supported without proprietary Fire-engine; the stack is heavy; cloud use leaks tab URLs; AGPL adds friction for no gain.
+1. **Drop self-hosted Firecrawl**: screenshots are not supported without proprietary Fire-engine; the stack is heavy; AGPL adds friction for no gain. **Hosted Firecrawl stays on the table as an opt-in backend** (see above): cheap, simple, and the privacy cost is containable.
 2. **Keep OG + extension capture** as the primary pipeline.
 3. **The gap is real (39%), so close it in stages, cheapest first.** Each stage is independently shippable and should be its own `ready-for-agent` issue:
    - **Stage 1: reuse by URL.** In the screenshot route's cache-miss branch, fall back to a capture belonging to another tab row with the same URL (typically the closed duplicate). No new infrastructure. Must be scoped per user once a household tier exists.
-   - **Stage 2: capture backend seam + Playwright sidecar.** Define a small `captureScreenshot(url)` interface and a Playwright (Apache-2.0) implementation in an optional Docker sidecar, off by default. Needs an SSRF guard (block private ranges, non-http schemes), a per-run cap like `OG_FETCH_LIMIT`, and a timeout. Writes the same `data/screenshots/<tabId>.jpg`, so serving is unchanged. Browserless could implement the same interface later.
+   - **Stage 2: capture backend seam + first backend.** Define a small `captureScreenshot(url)` interface with two interchangeable implementations, both off by default: (a) hosted Firecrawl via API key (least work, best rendering, discloses URLs) and (b) a Playwright (Apache-2.0) Docker sidecar (fully self-hosted). Ship one first; Jim picks (open question below). Needs an SSRF guard (block private ranges, non-http schemes), a per-run cap like `OG_FETCH_LIMIT`, and a timeout. Writes the same `data/screenshots/<tabId>.jpg`, so serving is unchanged. Browserless could implement the same interface later.
    - **Stage 3: backfill.** A capped, resumable job (or `shot-scraper` CLI) that drains the 415 backlog gradually, using the same backend and guard. Only after Stage 2 is proven on new tabs.
    - **Independent, not blocking:** retention/pruning for the 1.1 GB cache; per-user screenshot paths for the household tier (do the path change before Stage 2 if the tier is near).
 4. **Sequencing:** 1 first (small win now); 2 and 3 only if Stage 1 leaves a gap Jim still cares about. Server-side capture cannot see logged-in pages, so some tabs will remain preview-less by design.
 
 ## Open questions
 
+- **Hosted vs sidecar first?** Hosted Firecrawl is less work and cheaper to run but discloses tab URLs; the sidecar is private but heavier. Verify the screenshot credit cost with one call before deciding.
 - Is the remaining gap after Stage 1 worth running a headless browser for? (Re-measure after Stage 1.)
 - Should the 1.1 GB screenshot cache get pruning/retention (closed tabs are 96% of rows)? Independent of this decision.
 - Is any hosted/multi-tenant deployment contemplated? That is what would make AGPL/SSPL matter.
