@@ -42,7 +42,9 @@ beforeAll(async () => {
 })
 
 afterAll(() => {
-  fs.rmSync(scratchDir, { recursive: true, force: true })
+  // lib/db caches its connection for the whole `bun test` process and other
+  // route tests share it, so the scratch dir can only go at process exit.
+  process.once("exit", () => fs.rmSync(scratchDir, { recursive: true, force: true }))
 })
 
 async function ids(query: string): Promise<string[]> {
