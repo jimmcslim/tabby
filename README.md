@@ -239,6 +239,9 @@ Import validates: version 1, non-empty name, non-empty tabs, valid URLs (blocks 
 | `OLLAMA_URL` | `http://localhost:11434` | Ollama API endpoint |
 | `OLLAMA_MODEL` | `qwen3.5:latest` | Model for AI features |
 | `TABBY_DISABLE_ENRICHMENT` | unset | Set to `1` to suppress the background work a sync kicks off — OG image fetches, tweet lookups, and the Ollama classify/summarize pass. Tab, session and group writes are unaffected. Used by the end-to-end tests so they run offline and deterministically. |
+| `FIRECRAWL_API_KEY` | unset | Opt-in server-side screenshots via hosted Firecrawl for tabs with no extension capture and no OG image. **Sends those tabs' URLs to Firecrawl** and spends credits (4xx pages get one extra attempt at the domain root). Off when unset or when `TABBY_DISABLE_ENRICHMENT` is set. |
+| `CAPTURE_DRAIN_LIMIT` | `15` | Max Firecrawl calls per background capture drain. |
+| `CAPTURE_DENYLIST` | unset | Comma-separated domains (subdomains included) never sent for capture, added to built-in banking/mail defaults. Private/internal hosts and non-http(s) URLs are always refused. |
 | `NEXT_DIST_DIR` | `.next` | Next.js build directory. The test harness sets `.next-test` so a second dev server doesn't collide with your own. |
 
 ## Keyboard Shortcuts

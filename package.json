@@ -22,6 +22,7 @@
     "date-fns": "^4.1.0",
     "drizzle-orm": "^0.45.1",
     "embla-carousel-react": "^8.6.0",
+    "firecrawl": "4.52.0",
     "input-otp": "^1.4.2",
     "nanoid": "^5.1.6",
     "next": "16.1.6",
